@@ -10,7 +10,7 @@
         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         progress:
 
-          [.      ] - bytecode generator
+          [.     ] - bytecode generator
 
         ---------------------------------
         to run the tests:
@@ -31,4 +31,6 @@
   bfwasm - https://github.com/surma/bfwasm
   mini-c - https://github.com/maierfelix/mini-c
   Walt   - https://github.com/ballercat/walt
+  Wax    - https://github.com/LingDong-/wax
+  Never  - https://never-lang.readthedocs.io/
   AssemblyScript - https://www.assemblyscript.org/
