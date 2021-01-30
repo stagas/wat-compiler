@@ -660,3 +660,51 @@ describe('imports', () => {
     expect((await wasm(act, { math })).call_imported_function()).to.equal(42)
   }))
 })
+
+//
+//
+//
+
+describe('start', () => {
+  //
+  it('set a start function', () => buffers(`
+
+    (global $answer (mut i32) (i32.const 42))
+
+    (start $main)
+
+    (func $main
+      (global.set $answer (i32.const 666))
+    )
+
+    (func (export "get") (result i32)
+      (global.get $answer)
+    )
+
+  `, mod => mod
+
+    .global('answer', 'var', 'i32', [...i32.const(42)])
+
+    .start('main')
+
+    .func('main', [], [],
+      [],
+      [
+        ...INSTR.global.set(mod.getGlobalIndexOf('answer'), [i32.const(666)]),
+      ],
+      )
+
+    .func('get', [], ['i32'],
+      [],
+      [
+        ...INSTR.global.get(mod.getGlobalIndexOf('answer'))
+      ],
+      true)
+
+  )
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).get()).to.equal(666)
+    expect((await wasm(act)).get()).to.equal(666)
+  }))
+})
