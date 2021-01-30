@@ -372,8 +372,6 @@ describe('function call', () => {
 
     (table 2 funcref)
       (elem (i32.const 0) $f1 $f2)
-      ;;(func $xx (result i32 i64)
-      ;;  i32.const 42)
       (func $f1 (result i32)
         i32.const 42)
       (func $f2 (result i32)
@@ -385,12 +383,9 @@ describe('function call', () => {
 
   `, mod => mod
 
-    // table is implicitly derived for now from elem() calls
-      .elem(0, ['f1','f2'])
+      .table('funcref', 2)
 
-      // .func('xx', [], ['i32', 'i64'],
-      //   [],
-      //   [...i32.const(42)])
+      .elem([...i32.const(0)], ['f1','f2'])
 
       .func('f1', [], ['i32'],
         [],
@@ -438,8 +433,9 @@ describe('function call', () => {
 
   `, mod => mod
 
-    // table is implicitly derived for now from elem() calls
-      .elem(0, ['f1','f2'])
+      .table('funcref', 2)
+
+      .elem([...i32.const(0)], ['f1','f2'])
 
       .func('xx', [], ['i64'],
         [],
@@ -561,5 +557,73 @@ describe('globals', () => {
   .then(async ([exp,act]) => {
     expect((await wasm(exp)).get()).to.equal(666)
     expect((await wasm(act)).get()).to.equal(666)
+  }))
+})
+
+//
+//
+//
+
+describe('memory + data', () => {
+  //
+  it('local memory page min 1 - data 1 offset 0 i32', () => buffers(String.raw`
+
+    (memory 1)
+
+    (data (i32.const 0) "\2a")
+
+    (func (export "get") (result i32)
+      (i32.load (i32.const 0))
+    )
+
+  `, mod => mod
+
+    .memory(1)
+
+    .data([...i32.const(0)], [0x2a])
+
+    .func('get', [], ['i32'],
+      [],
+      [
+        ...i32.load([2,0], [i32.const(0)])
+      ],
+      true)
+
+  )
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).get()).to.equal(42)
+    expect((await wasm(act)).get()).to.equal(42)
+  }))
+
+  //
+  it('local memory page min 1 max 2 - data 1 offset 0 i32', () => buffers(String.raw`
+
+    (memory 1 2)
+
+    (data (i32.const 0) "\2a")
+
+    (func (export "get") (result i32)
+      (i32.load (i32.const 0))
+    )
+
+  `, mod => mod
+
+    .memory(1, 2)
+
+    .data([...i32.const(0)], [0x2a])
+
+    .func('get', [], ['i32'],
+      [],
+      [
+        ...i32.load([2,0], [i32.const(0)])
+      ],
+      true)
+
+  )
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).get()).to.equal(42)
+    expect((await wasm(act)).get()).to.equal(42)
   }))
 })
