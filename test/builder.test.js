@@ -1,9 +1,8 @@
 import ModuleBuilder from '../lib/builder.js'
-import { BYTE, INSTR } from '../lib/const.js'
+import { INSTR } from '../lib/const.js'
 import { hexAssertEqual } from './util/hex.js'
 import wat from './util/wat.js'
 
-const { type } = BYTE
 const { i32, i64, local } = INSTR
 
 async function wasm (binary, imports = {}) {
