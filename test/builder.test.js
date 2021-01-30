@@ -25,7 +25,7 @@ async function buffers (code, fn) {
 describe('function declaration', () => {
   //
   it(`1 function
-        0 params, 1 returns [i32]
+        0 params, 1 results [i32]
         0 locals
         exported`, () => buffers(`
 
@@ -44,7 +44,7 @@ describe('function declaration', () => {
 
   //
   it(`1 function
-        0 params, 1 returns [i32]
+        0 params, 1 results [i32]
         0 locals
         not exported`, () => buffers(`
 
@@ -63,7 +63,7 @@ describe('function declaration', () => {
 
   //
   it(`2 functions
-        a, b: 0 params, 1 returns [i32]
+        a, b: 0 params, 1 results [i32]
         a, b: 0 locals
         a, b: exported`, () => buffers(`
 
@@ -89,7 +89,7 @@ describe('function declaration', () => {
 
   //
   it(`2 functions
-        a, b: 0 params, 1 returns [i32]
+        a, b: 0 params, 1 results [i32]
         a, b: 0 locals
         a: exported
         b: not exported`, () => buffers(`
@@ -116,8 +116,8 @@ describe('function declaration', () => {
 
   //
   it(`2 functions
-           a: 0 params, 1 returns [i32],
-           b: 1 params [i32], 1 returns [i32]
+           a: 0 params, 1 results [i32],
+           b: 1 params [i32], 1 results [i32]
         a, b: 0 locals
         a, b: exported`, () => buffers(`
 
@@ -150,7 +150,7 @@ describe('function declaration', () => {
 describe('function locals', () => {
   //
   it(`1 function
-        0 params, 1 returns [i32]
+        0 params, 1 results [i32]
         1 locals [i32]
         exported`, () => buffers(`
 
@@ -170,7 +170,7 @@ describe('function locals', () => {
 
   //
   it(`1 function
-        0 params, 1 returns [i32]
+        0 params, 1 results [i32]
         2 locals [i32, i64] (different)
         exported`, () => buffers(`
 
@@ -191,7 +191,7 @@ describe('function locals', () => {
 
   //
   it(`1 function
-        0 params, 1 returns [i32]
+        0 params, 1 results [i32]
         3 locals [i32, i64, i32] (disjointed)
         exported`, () => buffers(`
 
@@ -213,7 +213,7 @@ describe('function locals', () => {
 
   //
   it(`1 function
-        0 params, 1 returns [i32]
+        0 params, 1 results [i32]
         3 locals [i32, i32, i64] (joined)
         exported`, () => buffers(`
 
@@ -242,7 +242,7 @@ describe('function locals', () => {
 describe('function body', () => {
   //
   it(`1 function - add 2 numbers (s-expression)
-        2 params, 1 returns [i32]
+        2 params, 1 results [i32]
         0 locals
         exported`, () => buffers(`
 
@@ -268,7 +268,7 @@ describe('function body', () => {
 
   //
   it(`1 function - add 2 numbers (stack)
-        2 params, 1 returns [i32]
+        2 params, 1 results [i32]
         0 locals
         exported`, () => buffers(`
 
@@ -298,7 +298,7 @@ describe('function body', () => {
 
   //
   it(`1 function - add 2 numbers (tee + s-expression)
-        1 params, 1 returns [i32]
+        1 params, 1 results [i32]
         1 locals
         exported`, () => buffers(`
 
@@ -625,5 +625,39 @@ describe('memory + data', () => {
   .then(async ([exp,act]) => {
     expect((await wasm(exp)).get()).to.equal(42)
     expect((await wasm(act)).get()).to.equal(42)
+  }))
+})
+
+//
+//
+//
+
+describe('imports', () => {
+  //
+  it('import function', () => buffers(`
+
+    (import "math" "add" (func $add (param i32 i32) (result i32)))
+
+    (func (export "call_imported_function") (result i32)
+      (call $add (i32.const 20) (i32.const 22))
+    )
+
+  `, mod => mod
+
+    .import('func', 'math', 'add', ['i32','i32'], ['i32'])
+
+    .func('call_imported_function', [], ['i32'],
+      [],
+      [
+        ...INSTR.call(mod.getFunc('math.add').idx, [i32.const(20), i32.const(22)])
+      ],
+      true)
+
+  )
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    const math = { add: (a, b) => a + b }
+    expect((await wasm(exp, { math })).call_imported_function()).to.equal(42)
+    expect((await wasm(act, { math })).call_imported_function()).to.equal(42)
   }))
 })
