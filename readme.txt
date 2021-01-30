@@ -10,7 +10,8 @@
         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         progress:
 
-          [..... ] - bytecode generator
+          [......] - bytecode generator
+          [      ] - ???
 
         ---------------------------------
         to run the tests:
@@ -23,6 +24,7 @@
         code belongs in the public domain
 
 +--------------------------------------------------+
+
 
 story so far:
 ~~~~~~~~~~~~~
@@ -60,6 +62,38 @@ https://github.com/rui314/chibicc
 You should check it out.
 
 Thanks for reading!
+
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+update:
+~~~~~~~
+
+The ModuleBuilder component is fairly complete.
+Are there missing cases? Certainly.
+But for our purposes, this is acceptable coverage,
+one which allows us to move forward.
+We will certainly revisit these interfaces so
+it's also best to not rigidify them too much with
+too many test cases so it's also easier to refactor
+in case we need some major change.
+The missing remaining cases will be added as needed.
+
+Next steps ?
+
+Implement low level compiler components such as
+a heap, maybe a stack, type inference, type
+casting/solving, closures etc. These should not
+be tightly coupled but instead provide clean user
+interfaces and as such allow someone to pick
+and combine them to create higher order
+interfaces i.e programming languages. A lot of
+these have been implemented by other languages
+targetting WASM so again some research is necessary
+to see if we can reuse some code and not have to
+reimplement them.
+
 
 
 +--------------------------------------------------+
