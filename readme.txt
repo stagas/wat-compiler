@@ -10,7 +10,7 @@
         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         progress:
 
-          [.     ] - bytecode generator
+          [...   ] - bytecode generator
 
         ---------------------------------
         to run the tests:
