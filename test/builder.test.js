@@ -4,7 +4,7 @@ import { hexAssertEqual } from './util/hex.js'
 import wat from './util/wat.js'
 
 const { type } = BYTE
-const { i32, local } = INSTR
+const { i32, i64, local } = INSTR
 
 async function wasm (binary, imports = {}) {
   const mod = await WebAssembly.instantiate(binary.buffer, imports)
@@ -333,13 +333,13 @@ describe('function body', () => {
 
 describe('function call', () => {
   //
-  it('call another function', () => buffers(`
+  it('call function direct', () => buffers(`
 
     (func $dbl (param $a i32) (result i32)
       (i32.add (local.get $a) (local.get $a))
     )
 
-    (func (export "call_another") (param $a i32) (result i32)
+    (func (export "call_function_direct") (param $a i32) (result i32)
       (call $dbl (local.get $a))
     )
 
@@ -352,18 +352,125 @@ describe('function call', () => {
       ]
       )
 
-    .func('call_another', ['i32'], ['i32'],
+    .func('call_function_direct', ['i32'], ['i32'],
       [],
       [
-        ...INSTR.call(mod.indexOfFunc('dbl'), [local.get(0)])
+        ...INSTR.call(mod.getFunc('dbl').idx, [local.get(0)])
       ],
       true)
 
   )
   .then(([exp,act]) => hexAssertEqual(exp,act))
   .then(async ([exp,act]) => {
-    expect((await wasm(exp)).call_another(333)).to.equal(666)
-    expect((await wasm(act)).call_another(333)).to.equal(666)
+    expect((await wasm(exp)).call_function_direct(333)).to.equal(666)
+    expect((await wasm(act)).call_function_direct(333)).to.equal(666)
+  }))
+
+  //
+  it('call function indirect (table)', () => buffers(`
+    (type $return_i32 (func (result i32)))
+
+    (table 2 funcref)
+      (elem (i32.const 0) $f1 $f2)
+      ;;(func $xx (result i32 i64)
+      ;;  i32.const 42)
+      (func $f1 (result i32)
+        i32.const 42)
+      (func $f2 (result i32)
+        i32.const 13)
+
+    (func (export "call_function_indirect") (param $a i32) (result i32)
+      (call_indirect (type $return_i32) (local.get $a))
+    )
+
+  `, mod => mod
+
+    // table is implicitly derived for now from elem() calls
+      .elem(0, ['f1','f2'])
+
+      // .func('xx', [], ['i32', 'i64'],
+      //   [],
+      //   [...i32.const(42)])
+
+      .func('f1', [], ['i32'],
+        [],
+        [...i32.const(42)])
+
+      .func('f2', [], ['i32'],
+        [],
+        [...i32.const(13)])
+
+    .func('call_function_indirect', ['i32'], ['i32'],
+      [],
+      [
+        ...INSTR.call_indirect(
+          [mod.getFunc('f1').type_idx, 0],
+          [local.get(0)])
+      ],
+      true)
+
+  )
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).call_function_indirect(0)).to.equal(42)
+    expect((await wasm(exp)).call_function_indirect(1)).to.equal(13)
+    expect((await wasm(act)).call_function_indirect(0)).to.equal(42)
+    expect((await wasm(act)).call_function_indirect(1)).to.equal(13)
+  }))
+
+  //
+  it('call function indirect (table) non zero indexed ref types', () => buffers(`
+    (type $return_i64 (func (result i64)))
+    (type $return_i32 (func (result i32)))
+
+    (table 2 funcref)
+      (elem (i32.const 0) $f1 $f2)
+      (func $xx (result i64)
+        i64.const 42)
+      (func $f1 (result i32)
+        i32.const 42)
+      (func $f2 (result i32)
+        i32.const 13)
+
+    (func (export "call_function_indirect") (param $a i32) (result i32)
+      (call_indirect (type $return_i32) (local.get $a))
+    )
+
+  `, mod => mod
+
+    // table is implicitly derived for now from elem() calls
+      .elem(0, ['f1','f2'])
+
+      .func('xx', [], ['i64'],
+        [],
+        [...i64.const(42)])
+
+      .func('f1', [], ['i32'],
+        [],
+        [...i32.const(42)])
+
+      .func('f2', [], ['i32'],
+        [],
+        [...i32.const(13)])
+
+    .func('call_function_indirect', ['i32'], ['i32'],
+      [],
+      [
+        ...INSTR.call_indirect(
+          // call_indirect takes 2 arguments: typeidx, tableidx
+          [mod.getFunc('f1').type_idx, 0],
+          // and a reference table element index from the stack
+          [local.get(0)])
+      ],
+      true)
+
+  )
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).call_function_indirect(0)).to.equal(42)
+    expect((await wasm(exp)).call_function_indirect(1)).to.equal(13)
+    expect((await wasm(act)).call_function_indirect(0)).to.equal(42)
+    expect((await wasm(act)).call_function_indirect(1)).to.equal(13)
   }))
 
 })
