@@ -644,7 +644,7 @@ describe('imports', () => {
 
   `, mod => mod
 
-    .import('func', 'math', 'add', ['i32','i32'], ['i32'])
+    .import('func', 'math.add', 'math', 'add', ['i32','i32'], ['i32'])
 
     .func('call_imported_function', [], ['i32'],
       [],
