@@ -584,7 +584,7 @@ describe('memory + data', () => {
     .func('get', [], ['i32'],
       [],
       [
-        ...i32.load([2,0], [i32.const(0)])
+        ...i32.load([2,0], i32.const(0))
       ],
       true)
 
