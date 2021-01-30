@@ -474,3 +474,92 @@ describe('function call', () => {
   }))
 
 })
+
+//
+//
+//
+
+describe('globals', () => {
+  //
+  it('1 global const (immutable)', () => buffers(`
+
+    (global $answer i32 (i32.const 42))
+
+    (func (export "get") (result i32)
+      (global.get $answer)
+    )
+
+  `, mod => mod
+
+    .global('answer', 'const', 'i32', [...i32.const(42)])
+
+    .func('get', [], ['i32'],
+      [],
+      [
+        ...INSTR.global.get(mod.getGlobalIndexOf('answer'))
+      ],
+      true)
+
+  )
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).get()).to.equal(42)
+    expect((await wasm(act)).get()).to.equal(42)
+  }))
+
+  //
+  it('1 global var (mut)', () => buffers(`
+
+    (global $answer (mut i32) (i32.const 42))
+
+    (func (export "get") (result i32)
+      (global.get $answer)
+    )
+
+  `, mod => mod
+
+    .global('answer', 'var', 'i32', [...i32.const(42)])
+
+    .func('get', [], ['i32'],
+      [],
+      [
+        ...INSTR.global.get(mod.getGlobalIndexOf('answer'))
+      ],
+      true)
+
+  )
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).get()).to.equal(42)
+    expect((await wasm(act)).get()).to.equal(42)
+  }))
+
+  //
+  it('1 global var (mut) + mutate', () => buffers(`
+
+    (global $answer (mut i32) (i32.const 42))
+
+    (func (export "get") (result i32)
+      (global.set $answer (i32.const 666))
+      (global.get $answer)
+    )
+
+  `, mod => mod
+
+    .global('answer', 'var', 'i32', [...i32.const(42)])
+
+    .func('get', [], ['i32'],
+      [],
+      [
+        ...INSTR.global.set(mod.getGlobalIndexOf('answer'), [i32.const(666)]),
+        ...INSTR.global.get(mod.getGlobalIndexOf('answer'))
+      ],
+      true)
+
+  )
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).get()).to.equal(666)
+    expect((await wasm(act)).get()).to.equal(666)
+  }))
+})
