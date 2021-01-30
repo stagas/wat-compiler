@@ -326,3 +326,44 @@ describe('function body', () => {
   }))
 
 })
+
+//
+//
+//
+
+describe('function call', () => {
+  //
+  it('call another function', () => buffers(`
+
+    (func $dbl (param $a i32) (result i32)
+      (i32.add (local.get $a) (local.get $a))
+    )
+
+    (func (export "call_another") (param $a i32) (result i32)
+      (call $dbl (local.get $a))
+    )
+
+  `, mod => mod
+
+    .func('dbl', ['i32'], ['i32'],
+      [],
+      [
+        ...i32.add([], [local.get(0), local.get(0)]),
+      ]
+      )
+
+    .func('call_another', ['i32'], ['i32'],
+      [],
+      [
+        ...INSTR.call(mod.indexOfFunc('dbl'), [local.get(0)])
+      ],
+      true)
+
+  )
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).call_another(333)).to.equal(666)
+    expect((await wasm(act)).call_another(333)).to.equal(666)
+  }))
+
+})
