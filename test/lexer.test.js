@@ -94,6 +94,20 @@ describe('number', () => {
       { value: '-12.3', kind: 'number', index: 0 }
     ])
   })
+
+  it('1e5', () => {
+    const tokens = lexer('1e5')
+    expect(tokens).to.deep.equal([
+      { value: '1e5', kind: 'number', index: 0 }
+    ])
+  })
+
+  it('1.23e5', () => {
+    const tokens = lexer('1.23e5')
+    expect(tokens).to.deep.equal([
+      { value: '1.23e5', kind: 'number', index: 0 }
+    ])
+  })
 })
 
 describe('complex', () => {
