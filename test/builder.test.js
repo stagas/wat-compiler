@@ -603,7 +603,12 @@ describe('memory + data', () => {
     (data (i32.const 0) "\2a")
 
     (func (export "get") (result i32)
-      (i32.load (i32.const 0))
+      i32.const 1
+      i32.const 2
+      drop
+      drop
+      i32.const 0
+      i32.load offset=0 align=4
     )
 
   `, mod => mod
@@ -615,7 +620,12 @@ describe('memory + data', () => {
     .func('get', [], ['i32'],
       [],
       [
-        ...i32.load([2,0], [i32.const(0)])
+        ...i32.const(1),
+        ...i32.const(2),
+        ...INSTR.drop(),
+        ...INSTR.drop(),
+        ...i32.const(0),
+        ...i32.load([2,0])
       ],
       true)
 
