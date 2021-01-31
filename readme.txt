@@ -11,7 +11,8 @@
         progress:
 
           [......] - bytecode generator
-          [..... ] - lexer
+          [......] - lexer / tokenizer
+          [      ] - parser
 
         ---------------------------------
         to run the tests:
@@ -112,6 +113,46 @@ we can move to a streaming implementation because
 matchAll is a generator and it allows it.
 While we do that we can also implement helpers like
 .peek(), .consume() etc.
+
+
+...later:
+~~~~~~~~~
+
+A "tokenizer" "class" was implemented as a companion
+to the lexer, with all the common recursive descent
+helpers such as accept() peek() expect() and also
+literal().
+
+accept() and expect() will return the consumed token
+in case you need it.
+
+The tokenizer needs to be explicitly started by calling
+start() which does nothing else but calls the first
+advance() to fetch the token from the generator and
+make it available for the rest of the methods.
+
+These were implemented in a closure style instead of
+class so that you can destructure them without the need
+to bind the methods:
+
+const { start, peek, advance, expect, literal } = tokenizer(code)
+
+This is also an iterator so there is a next()
+method but does not concern the tokenizer and it will
+also emit nullish characters which we'll not be using
+in the parser. Nevertheless, the API is as simple:
+
+const tokens = [...tokenizer(code)]
+
+I'm not sure if WAT's source code really needs all this
+interface to be parsed or even recursive descent at
+all, but the code wasn't that complicated and I wanted
+a tokenizer I can reuse and adapt in other projects
+as well.
+
+Next move, parser.
+
+p.s Happy coincidence! We got 42 tests so far! :D
 
 
 
