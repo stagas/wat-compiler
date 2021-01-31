@@ -1,17 +1,27 @@
-import { tokenizer } from '../lib/lexer.js'
+import { tokenize } from '../lib/lexer.js'
 
-describe('tokenizer', () => {
+describe('tokenize', () => {
   it('start + accept', () => {
-    const { start, accept } = tokenizer('hello')
+    const { start, accept } = tokenize('hello')
     start()
     expect(accept('instr')).to.deep.equal(
       { value: 'hello', kind: 'instr', index: 0 }
     )
-    expect(accept('instr')).to.equal(false)
+    expect(accept('instr')).to.equal(null)
+  })
+
+  it('accept with value', () => {
+    const { start, accept } = tokenize('hello')
+    start()
+    expect(accept('instr', 'world')).to.equal(null)
+    expect(accept('instr', 'hello')).to.deep.equal(
+      { value: 'hello', kind: 'instr', index: 0 }
+    )
+    expect(accept('instr')).to.equal(null)
   })
 
   it('expect', () => {
-    const { start, expect: _expect } = tokenizer('hello 123 $world')
+    const { start, expect: _expect } = tokenize('hello 123 $world')
     start()
     expect(_expect('instr')).to.deep.equal(
       { value: 'hello', kind: 'instr', index: 0 }
@@ -30,21 +40,21 @@ describe('tokenizer', () => {
     )
   })
 
-  it('literal', () => {
-    const { start, literal } = tokenizer('hello 123 $world')
+  it('expect with value', () => {
+    const { start, expect: _expect } = tokenize('hello 123 $world')
     start()
-    expect(literal('hello')).to.deep.equal(
+    expect(_expect('instr', 'hello')).to.deep.equal(
       { value: 'hello', kind: 'instr', index: 0 }
     )
-    try { literal('foo') } catch (error) {
-      expect(error.message).to.include('Unexpected value: 123')
-      expect(error.message).to.include('expected: foo')
+    try { _expect('number', '546') } catch (error) {
+      expect(error.message).to.include('Unexpected token: 123')
+      expect(error.message).to.include('expected: number "546"')
       expect(error.message).to.include('position: 6')
     }
   })
 
   it('peek + advance', () => {
-    const { start, peek, advance } = tokenizer('hello 123 $world')
+    const { start, peek, advance } = tokenize('hello 123 $world')
     start()
     expect(peek()).to.deep.equal(
       { value: 'hello', kind: 'instr', index: 0 }
@@ -61,7 +71,7 @@ describe('tokenizer', () => {
   })
 
   it('should act as an iterator (simple lexer incl. nul)', () => {
-    const tokens = [...tokenizer('hello 123 $world')]
+    const tokens = [...tokenize('hello 123 $world')]
     expect(tokens).to.deep.equal([
       { value: 'hello', kind: 'instr', index: 0 },
       { value: ' ', kind: 'nul', index: 5 },

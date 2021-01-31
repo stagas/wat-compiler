@@ -8,6 +8,14 @@ describe('lexer', () => {
     ])
   })
 
+  it('param', () => {
+    const tokens = lexer('align=4')
+    expect(tokens).to.deep.equal([
+      { value: 'align', kind: 'param', index: 0 },
+      { value: '4', kind: 'number', index: 6 }
+    ])
+  })
+
   it('label', () => {
     const tokens = lexer('$hello $$hi')
     expect(tokens).to.deep.equal([
