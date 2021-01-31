@@ -74,40 +74,34 @@ describe('lexer', () => {
 })
 
 describe('number', () => {
-  it('12', () => {
-    const tokens = lexer('12')
+  ;[
+    '12',
+    '12.3',
+    '-12.3',
+    '+12.3',
+    '1e5',
+    '1.23e5',
+    '1.23e-5',
+    '1.23e+5',
+  ].forEach(n => it(n, () => {
+    const tokens = lexer(n)
     expect(tokens).to.deep.equal([
-      { value: '12', kind: 'number', index: 0 }
+      { value: n, kind: 'number', index: 0 }
     ])
-  })
+  }))
 
-  it('12.3', () => {
-    const tokens = lexer('12.3')
+  ;[
+    '-0xf2',
+    '+0xf2',
+    '0xf2.ef',
+    '0xf2.ePf',
+    '0xf2.P-f',
+  ].forEach(n => it(n, () => {
+    const tokens = lexer(n)
     expect(tokens).to.deep.equal([
-      { value: '12.3', kind: 'number', index: 0 }
+      { value: n, kind: 'hex', index: 0 }
     ])
-  })
-
-  it('-12.3', () => {
-    const tokens = lexer('-12.3')
-    expect(tokens).to.deep.equal([
-      { value: '-12.3', kind: 'number', index: 0 }
-    ])
-  })
-
-  it('1e5', () => {
-    const tokens = lexer('1e5')
-    expect(tokens).to.deep.equal([
-      { value: '1e5', kind: 'number', index: 0 }
-    ])
-  })
-
-  it('1.23e5', () => {
-    const tokens = lexer('1.23e5')
-    expect(tokens).to.deep.equal([
-      { value: '1.23e5', kind: 'number', index: 0 }
-    ])
-  })
+  }))
 })
 
 describe('complex', () => {
