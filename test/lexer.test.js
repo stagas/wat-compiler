@@ -1,0 +1,216 @@
+import lexer from '../lib/lexer.js'
+
+describe('lexer', () => {
+  it('instr', () => {
+    const tokens = lexer('hello')
+    expect(tokens).to.deep.equal([
+      { value: 'hello', kind: 'instr', index: 0 }
+    ])
+  })
+
+  it('label', () => {
+    const tokens = lexer('$hello')
+    expect(tokens).to.deep.equal([
+      { value: 'hello', kind: 'label', index: 0 }
+    ])
+  })
+
+  it('string', () => {
+    const tokens = lexer('"hello"')
+    expect(tokens).to.deep.equal([
+      { value: 'hello', kind: 'string', index: 0 }
+    ])
+  })
+
+  it('number', () => {
+    const tokens = lexer('123')
+    expect(tokens).to.deep.equal([
+      { value: '123', kind: 'number', index: 0 }
+    ])
+  })
+
+  it('hex', () => {
+    const tokens = lexer('0xf2')
+    expect(tokens).to.deep.equal([
+      { value: '0xf2', kind: 'hex', index: 0 }
+    ])
+  })
+
+  it('parens', () => {
+    const tokens = lexer('()')
+    expect(tokens).to.deep.equal([
+      { value: '(', kind: 'lparen', index: 0 },
+      { value: ')', kind: 'rparen', index: 1 }
+    ])
+  })
+
+  it('comments', () => {
+    const tokens = lexer('an (; inline ;) comment\n;; line comment')
+    expect(tokens).to.deep.equal([
+      { value: 'an', kind: 'instr', index: 0 },
+      { value: ' ', kind: 'nul', index: 2 },
+      { value: '(; inline ;)', kind: 'comment', index: 3 },
+      { value: ' ', kind: 'nul', index: 15 },
+      { value: 'comment', kind: 'instr', index: 16 },
+      { value: '\n', kind: 'nul', index: 23 },
+      { value: ';; line comment', kind: 'comment', index: 24 }
+    ])
+  })
+
+  it('nul', () => {
+    const tokens = lexer(' \n\t')
+    expect(tokens).to.deep.equal([
+      { value: ' \n\t', kind: 'nul', index: 0 },
+    ])
+  })
+
+  it('error', () => {
+    const tokens = lexer('%what')
+    expect(tokens).to.deep.equal([
+      { value: '%', kind: 'error', index: 0 },
+      { value: 'what', kind: 'instr', index: 1 },
+    ])
+  })
+})
+
+describe('number', () => {
+  it('12', () => {
+    const tokens = lexer('12')
+    expect(tokens).to.deep.equal([
+      { value: '12', kind: 'number', index: 0 }
+    ])
+  })
+
+  it('12.3', () => {
+    const tokens = lexer('12.3')
+    expect(tokens).to.deep.equal([
+      { value: '12.3', kind: 'number', index: 0 }
+    ])
+  })
+
+  it('-12.3', () => {
+    const tokens = lexer('-12.3')
+    expect(tokens).to.deep.equal([
+      { value: '-12.3', kind: 'number', index: 0 }
+    ])
+  })
+})
+
+describe('complex', () => {
+  it('complex case 1', () => {
+    const tokens = lexer(`
+(hello $hi
+  "world")
+;; (should) be a comment
+and (; another ;) line 0x312 43.23
+`)
+    // console.log(JSON.stringify(tokens, null, 2))
+    expect(tokens).to.deep.equal([
+      {
+        "value": "\n",
+        "kind": "nul",
+        "index": 0
+      },
+      {
+        "value": "(",
+        "kind": "lparen",
+        "index": 1
+      },
+      {
+        "value": "hello",
+        "kind": "instr",
+        "index": 2
+      },
+      {
+        "value": " ",
+        "kind": "nul",
+        "index": 7
+      },
+      {
+        "value": "hi",
+        "kind": "label",
+        "index": 8
+      },
+      {
+        "value": "\n  ",
+        "kind": "nul",
+        "index": 11
+      },
+      {
+        "value": "world",
+        "kind": "string",
+        "index": 14
+      },
+      {
+        "value": ")",
+        "kind": "rparen",
+        "index": 21
+      },
+      {
+        "value": "\n",
+        "kind": "nul",
+        "index": 22
+      },
+      {
+        "value": ";; (should) be a comment",
+        "kind": "comment",
+        "index": 23
+      },
+      {
+        "value": "\n",
+        "kind": "nul",
+        "index": 47
+      },
+      {
+        "value": "and",
+        "kind": "instr",
+        "index": 48
+      },
+      {
+        "value": " ",
+        "kind": "nul",
+        "index": 51
+      },
+      {
+        "value": "(; another ;)",
+        "kind": "comment",
+        "index": 52
+      },
+      {
+        "value": " ",
+        "kind": "nul",
+        "index": 65
+      },
+      {
+        "value": "line",
+        "kind": "instr",
+        "index": 66
+      },
+      {
+        "value": " ",
+        "kind": "nul",
+        "index": 70
+      },
+      {
+        "value": "0x312",
+        "kind": "hex",
+        "index": 71
+      },
+      {
+        "value": " ",
+        "kind": "nul",
+        "index": 76
+      },
+      {
+        "value": "43.23",
+        "kind": "number",
+        "index": 77
+      },
+      {
+        "value": "\n",
+        "kind": "nul",
+        "index": 82
+      }
+    ])
+  })
+})

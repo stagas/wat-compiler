@@ -11,7 +11,7 @@
         progress:
 
           [......] - bytecode generator
-          [      ] - ???
+          [..... ] - lexer
 
         ---------------------------------
         to run the tests:
@@ -93,6 +93,25 @@ these have been implemented by other languages
 targetting WASM so again some research is necessary
 to see if we can reuse some code and not have to
 reimplement them.
+
+
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+update [31 jan 21]:
+~~~~~~~~~~~~~~~~~~~
+
+Decided to implement a WAT compiler to see if it
+is possible with the current tooling.
+Currently working on the lexer, an initial
+implementation is mainly complete but currently
+parses the entire file into memory.
+This shouldn't much of an issue but nevertheless
+we can move to a streaming implementation because
+matchAll is a generator and it allows it.
+While we do that we can also implement helpers like
+.peek(), .consume() etc.
 
 
 
