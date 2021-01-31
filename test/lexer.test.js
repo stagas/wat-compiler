@@ -83,6 +83,10 @@ describe('number', () => {
     '1.23e5',
     '1.23e-5',
     '1.23e+5',
+    'nan',
+    'inf',
+    '+inf',
+    '-inf',
   ].forEach(n => it(n, () => {
     const tokens = lexer(n)
     expect(tokens).to.deep.equal([
@@ -96,6 +100,7 @@ describe('number', () => {
     '0xf2.ef',
     '0xf2.ePf',
     '0xf2.P-f',
+    'nan:0xff',
   ].forEach(n => it(n, () => {
     const tokens = lexer(n)
     expect(tokens).to.deep.equal([
