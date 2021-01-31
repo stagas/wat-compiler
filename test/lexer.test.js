@@ -16,9 +16,12 @@ describe('lexer', () => {
   })
 
   it('string', () => {
-    const tokens = lexer('"hello"')
+    const r = String.raw
+    const tokens = lexer(r`"hello""ano\"t\n\ther""more"`)
     expect(tokens).to.deep.equal([
-      { value: 'hello', kind: 'string', index: 0 }
+      { value: 'hello', kind: 'string', index: 0 },
+      { value: r`ano\"t\n\ther`, kind: 'string', index: 7 },
+      { value: 'more', kind: 'string', index: 22 }
     ])
   })
 
