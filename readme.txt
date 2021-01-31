@@ -12,7 +12,8 @@
 
           [......] - bytecode generator
           [......] - lexer / tokenizer
-          [      ] - parser
+          [......] - parser
+          [.     ] - compiler
 
         ---------------------------------
         to run the tests:
@@ -153,6 +154,23 @@ as well.
 Next move, parser.
 
 p.s Happy coincidence! We got 42 tests so far! :D
+
+
+
+update [01 feb 21]:
+~~~~~~~~~~~~~~~~~~~
+
+Success! We got a working parser and compiler
+which can parse and compile a single function returning
+a single value!
+Now remains to implement every other operation..
+However, we've reached end to end of the implementation
+and it looks to be ~2 orders of magnitude faster than
+the wabt tool. For the same WAT source code it
+parses and compiles at around ~0.5ms vs ~15ms cold run
+and ~0.15ms vs ~10ms on live reload.
+But we'll see how that will scale when there's more
+complex code and JS (de)optimizations kick in.
 
 
 
