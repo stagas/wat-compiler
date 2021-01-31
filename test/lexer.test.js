@@ -9,9 +9,11 @@ describe('lexer', () => {
   })
 
   it('label', () => {
-    const tokens = lexer('$hello')
+    const tokens = lexer('$hello $$hi')
     expect(tokens).to.deep.equal([
-      { value: 'hello', kind: 'label', index: 0 }
+      { value: 'hello', kind: 'label', index: 0 },
+      { value: ' ', kind: 'nul', index: 6 },
+      { value: '$hi', kind: 'label', index: 7 }
     ])
   })
 
@@ -68,9 +70,9 @@ describe('lexer', () => {
   })
 
   it('error', () => {
-    const tokens = lexer('%what')
+    const tokens = lexer('§what')
     expect(tokens).to.deep.equal([
-      { value: '%', kind: 'error', index: 0 },
+      { value: '§', kind: 'error', index: 0 },
       { value: 'what', kind: 'instr', index: 1 },
     ])
   })
