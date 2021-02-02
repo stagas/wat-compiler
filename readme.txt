@@ -13,7 +13,7 @@
           [......] - bytecode generator
           [......] - lexer / tokenizer
           [......] - parser
-          [.     ] - compiler
+          [..    ] - compiler
 
         ---------------------------------
         to run the tests:
@@ -171,6 +171,30 @@ parses and compiles at around ~0.5ms vs ~15ms cold run
 and ~0.15ms vs ~10ms on live reload.
 But we'll see how that will scale when there's more
 complex code and JS (de)optimizations kick in.
+
+
+
+update [02 feb 21]:
+~~~~~~~~~~~~~~~~~~~
+
+The compiler is progressing. The test suite seems
+to be adequate as it is always pinpointing where the
+issue might be so not a lot of time is wasted in
+figuring out why something isn't working, so that's
+a positive thing. The bad news is I've jumped to the
+assumption that a mostly pure functional compiler
+architecture would be possible, but it seems that
+a lot of edge cases have started appearing here and
+there, we might need a table to handle function
+signatures as they don't seem to be following the
+same paradigm. It's a pity as the syntax was close
+to perfect so that thing wouldn't be needed if there
+was a little more consideration in how you
+differentiate between instruction parameters and
+stack arguments. I could be wrong though and there
+is some higher structure I'm not seeing yet.
+Anyway, it's a small price to pay so we might
+go for that.
 
 
 
