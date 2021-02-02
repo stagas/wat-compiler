@@ -324,6 +324,36 @@ describe('function body', () => {
     expect((await wasm(act)).add(22)).to.equal(42)
   }))
 
+  //
+  it(`1 function - add 2 numbers (tee + s-expression)
+        2 params, 1 results [i32]
+        0 locals
+        exported`, () => buffers(`
+
+    (func (export "add") (param i32 i32) (result i32)
+      (local.get 0)
+      (local.get 1)
+      (i32.add)
+    )
+
+  `, mod => mod
+
+    .func('add', ['i32','i32'], ['i32'],
+      [],
+      [
+        ...local.get(0),
+        ...local.get(1),
+        ...i32.add()
+      ],
+      true)
+
+  )
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).add(20, 22)).to.equal(42)
+    expect((await wasm(act)).add(20, 22)).to.equal(42)
+  }))
+
 })
 
 //
