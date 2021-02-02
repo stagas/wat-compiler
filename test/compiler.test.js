@@ -11,7 +11,7 @@ async function wasm (binary, imports = {}) {
 
 async function buffers (code) {
   const expected = await wat(code)
-  console.log(expected.log)
+  // console.log(expected.log)
   const actual = compile(parse(tokenize(code)))
   return [expected.buffer, actual.buffer]
 }
@@ -108,5 +108,30 @@ describe('compile', () => {
   .then(async ([exp,act]) => {
     expect((await wasm(exp)).add(22)).to.equal(42)
     expect((await wasm(act)).add(22)).to.equal(42)
+  }))
+
+  //
+  it('call function indirect (table)', () => buffers(`
+    (module
+      (type $return_i32 (func (result i32)))
+
+      (table 2 funcref)
+        (elem (i32.const 0) $f1 $f2)
+        (func $f1 (result i32)
+          i32.const 42)
+        (func $f2 (result i32)
+          i32.const 13)
+
+      (func (export "call_function_indirect") (param $a i32) (result i32)
+        (call_indirect (type $return_i32) (local.get $a))
+      )
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).call_function_indirect(0)).to.equal(42)
+    expect((await wasm(exp)).call_function_indirect(1)).to.equal(13)
+    expect((await wasm(act)).call_function_indirect(0)).to.equal(42)
+    expect((await wasm(act)).call_function_indirect(1)).to.equal(13)
   }))
 })

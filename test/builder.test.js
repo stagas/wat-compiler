@@ -412,6 +412,8 @@ describe('function call', () => {
 
   `, mod => mod
 
+      .type('return_i32', [], ['i32'])
+
       .table('funcref', 2)
 
       .elem([...i32.const(0)], ['f1','f2'])
@@ -428,7 +430,7 @@ describe('function call', () => {
       [],
       [
         ...INSTR.call_indirect(
-          [mod.getFunc('f1').type_idx, 0],
+          [mod.getType('return_i32'), 0],
           [local.get(0)])
       ],
       true)

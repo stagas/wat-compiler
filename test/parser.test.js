@@ -51,6 +51,53 @@ describe('parser', () => {
     })
   })
 
+  it('ref labels as children', () => {
+    const tree = parse(tokenize('(elem (i32.const 0) $f1 $f2)'))
+    expect(tree).to.deep.equal({
+      "instr": {
+        "value": "elem",
+        "kind": "instr",
+        "index": 1
+      },
+      "name": null,
+      "params": [],
+      "children": [
+        {
+          "instr": {
+            "value": "i32.const",
+            "kind": "instr",
+            "index": 7
+          },
+          "name": null,
+          "params": [
+            {
+              "param": {
+                "value": "0",
+                "kind": "number",
+                "index": 17
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "ref": {
+            "value": "f1",
+            "kind": "label",
+            "index": 20
+          }
+        },
+        {
+          "ref": {
+            "value": "f2",
+            "kind": "label",
+            "index": 24
+          }
+        }
+      ]
+    })
+  })
+
   it('s-expr number params', () => {
     const tree = parse(tokenize('(memory 1 2)'))
     expect(tree).to.deep.equal({
