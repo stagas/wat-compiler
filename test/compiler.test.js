@@ -240,7 +240,7 @@ describe('compile', () => {
   }))
 
   //
-  it.only('import function', () => buffers(`
+  it('import function', () => buffers(`
     (import "math" "add" (func $add (param i32 i32) (result i32)))
 
     (func (export "call_imported_function") (result i32)
@@ -253,4 +253,25 @@ describe('compile', () => {
     expect((await wasm(exp, { math })).call_imported_function()).to.equal(42)
     expect((await wasm(act, { math })).call_imported_function()).to.equal(42)
   }))
+
+  //
+  it('set a start function', () => buffers(`
+    (global $answer (mut i32) (i32.const 42))
+
+    (start $main)
+
+    (func $main
+      (global.set $answer (i32.const 666))
+    )
+
+    (func (export "get") (result i32)
+      (global.get $answer)
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).get()).to.equal(666)
+    expect((await wasm(act)).get()).to.equal(666)
+  }))
+
 })
