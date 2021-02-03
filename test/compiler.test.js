@@ -12,7 +12,7 @@ async function wasm (binary, imports = {}) {
 async function buffers (code) {
   const expected = await wat(code)
   // console.log(expected.log)
-  const actual = compile(parse(tokenize(code)))
+  const actual = compile(parse(tokenize('(module '+code+')')))
   return [expected.buffer, actual.buffer]
 }
 
@@ -80,14 +80,12 @@ describe('compile', () => {
 
   //
   it('call function direct', () => buffers(`
-    (module
-      (func $dbl (param $a i32) (result i32)
-        (i32.add (local.get $a) (local.get $a))
-      )
+    (func $dbl (param $a i32) (result i32)
+      (i32.add (local.get $a) (local.get $a))
+    )
 
-      (func (export "call_function_direct") (param $a i32) (result i32)
-        (call $dbl (local.get $a))
-      )
+    (func (export "call_function_direct") (param $a i32) (result i32)
+      (call $dbl (local.get $a))
     )
   `)
   .then(([exp,act]) => hexAssertEqual(exp,act))
@@ -112,19 +110,17 @@ describe('compile', () => {
 
   //
   it('call function indirect (table)', () => buffers(`
-    (module
-      (type $return_i32 (func (result i32)))
+    (type $return_i32 (func (result i32)))
 
-      (table 2 funcref)
-        (elem (i32.const 0) $f1 $f2)
-        (func $f1 (result i32)
-          i32.const 42)
-        (func $f2 (result i32)
-          i32.const 13)
+    (table 2 funcref)
+      (elem (i32.const 0) $f1 $f2)
+      (func $f1 (result i32)
+        i32.const 42)
+      (func $f2 (result i32)
+        i32.const 13)
 
-      (func (export "call_function_indirect") (param $a i32) (result i32)
-        (call_indirect (type $return_i32) (local.get $a))
-      )
+    (func (export "call_function_indirect") (param $a i32) (result i32)
+      (call_indirect (type $return_i32) (local.get $a))
     )
   `)
   .then(([exp,act]) => hexAssertEqual(exp,act))
@@ -134,4 +130,92 @@ describe('compile', () => {
     expect((await wasm(act)).call_function_indirect(0)).to.equal(42)
     expect((await wasm(act)).call_function_indirect(1)).to.equal(13)
   }))
+
+  //
+  it('call function indirect (table) non zero indexed ref types', () => buffers(`
+    (type $return_i64 (func (result i64)))
+    (type $return_i32 (func (result i32)))
+
+    (table 2 funcref)
+      (elem (i32.const 0) $f1 $f2)
+      (func $xx (result i64)
+        i64.const 42)
+      (func $f1 (result i32)
+        i32.const 42)
+      (func $f2 (result i32)
+        i32.const 13)
+
+    (func (export "call_function_indirect") (param $a i32) (result i32)
+      (call_indirect (type $return_i32) (local.get $a))
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).call_function_indirect(0)).to.equal(42)
+    expect((await wasm(exp)).call_function_indirect(1)).to.equal(13)
+    expect((await wasm(act)).call_function_indirect(0)).to.equal(42)
+    expect((await wasm(act)).call_function_indirect(1)).to.equal(13)
+  }))
+
+  //
+  it('1 global const (immutable)', () => buffers(`
+    (global $answer i32 (i32.const 42))
+
+    (func (export "get") (result i32)
+      (global.get $answer)
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).get()).to.equal(42)
+    expect((await wasm(act)).get()).to.equal(42)
+  }))
+
+  //
+  it('1 global var (mut)', () => buffers(`
+
+    (global $answer (mut i32) (i32.const 42))
+
+    (func (export "get") (result i32)
+      (global.get $answer)
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).get()).to.equal(42)
+    expect((await wasm(act)).get()).to.equal(42)
+  }))
+
+  //
+  it('1 global var (mut) + mutate', () => buffers(`
+    (global $answer (mut i32) (i32.const 42))
+
+    (func (export "get") (result i32)
+      (global.set $answer (i32.const 666))
+      (global.get $answer)
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).get()).to.equal(666)
+    expect((await wasm(act)).get()).to.equal(666)
+  }))
+
+  //
+  it('local memory page min 1 - data 1 offset 0 i32', () => buffers(String.raw`
+
+    (memory 1)
+
+    (data (i32.const 0) "\2a")
+
+    (func (export "get") (result i32)
+      (i32.load (i32.const 0))
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).get()).to.equal(42)
+    expect((await wasm(act)).get()).to.equal(42)
+  }))
+
 })

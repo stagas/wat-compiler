@@ -1,6 +1,8 @@
 import { tokenize } from '../lib/lexer.js'
 import parse from '../lib/parser.js'
 
+const r = String.raw
+
 // the following two utilities are used when developing
 // test cases to validate the code and to print the
 // json tree for inspection and copied for assertion
@@ -458,4 +460,42 @@ describe('parser', () => {
       ]
     })
   })
+
+  it('children', () => {
+    const code = r`(data (i32.const 0) "\2a")`
+    const tree = parse(tokenize(code))
+    expect(tree).to.deep.equal({
+      "instr": {
+        "value": "data",
+        "kind": "instr",
+        "index": 1
+      },
+      "name": null,
+      "params": [],
+      "children": [
+        {
+          "instr": {
+            "value": "i32.const",
+            "kind": "instr",
+            "index": 7
+          },
+          "name": null,
+          "params": [
+            {
+              "param": {
+                "value": "0",
+                "kind": "number",
+                "index": 17
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "data": [0x2a]
+        }
+      ]
+    })
+  })
+
 })
