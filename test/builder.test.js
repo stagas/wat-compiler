@@ -1,5 +1,5 @@
 import ModuleBuilder from '../lib/builder.js'
-import { INSTR } from '../lib/const.js'
+import { INSTR, BYTE } from '../lib/const.js'
 import { hexAssertEqual } from './util/hex.js'
 import wat from './util/wat.js'
 
@@ -12,7 +12,7 @@ async function wasm (binary, imports = {}) {
 
 async function buffers (code, fn) {
   const expected = await wat(code)
-  // console.log(expected.log)
+  console.log(expected.log)
   const actual = fn(new ModuleBuilder()).build()
   return [expected.buffer, actual.buffer]
 }
@@ -748,5 +748,54 @@ describe('start', () => {
   .then(async ([exp,act]) => {
     expect((await wasm(exp)).get()).to.equal(666)
     expect((await wasm(act)).get()).to.equal(666)
+  }))
+})
+
+//
+//
+//
+
+describe('if', () => {
+  //
+  it.only('dummy function', () => buffers(`
+    (memory 1)
+
+    (func $dummy)
+
+    (func (export "store") (param i32)
+      (if (result i32) (local.get 0)
+        (then (call $dummy) (i32.const 1))
+        (else (call $dummy) (i32.const 0))
+      )
+      (i32.const 2)
+      (i32.store)
+    )
+  `, mod => mod
+
+    .memory(1)
+
+    .func('dummy')
+
+    .func('store', ['i32'], [],
+      [],
+      [
+        ...INSTR.if([...INSTR.type.i32()], [local.get(0)]),
+          ...INSTR.call(mod.getFunc('dummy')),
+          ...i32.const(1),
+        ...INSTR.else(),
+          ...INSTR.call(mod.getFunc('dummy')),
+          ...i32.const(0),
+        ...INSTR.end(),
+
+        ...i32.const(2),
+        ...i32.store([2,0]),
+      ]
+      , true)
+
+  )
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).store()).to.equal(undefined)
+    expect((await wasm(act)).store()).to.equal(undefined)
   }))
 })
