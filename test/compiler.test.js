@@ -276,23 +276,34 @@ describe('compile', () => {
 
   //
   it('if else', () => buffers(`
-    (memory 1)
-
     (func $dummy)
 
-    (func (export "store") (param i32)
+    (func (export "foo") (param i32) (result i32)
       (if (result i32) (local.get 0)
         (then (call $dummy) (i32.const 1))
         (else (call $dummy) (i32.const 0))
       )
-      (i32.const 2)
-      (i32.store)
     )
   `)
-  .then(([exp,act]) => hexAssertEqual(exp,act)))
-  // .then(async ([exp,act]) => {
-    // expect((await wasm(exp)).get()).to.equal(666)
-    // expect((await wasm(act)).get()).to.equal(666)
-  // }))
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).foo(0)).to.equal(0)
+    expect((await wasm(exp)).foo(1)).to.equal(1)
+    expect((await wasm(act)).foo(0)).to.equal(0)
+    expect((await wasm(act)).foo(1)).to.equal(1)
+  }))
+
+  //
+  it('block', () => buffers(`
+    (func (export "answer") (result i32)
+      (block (nop))
+      (block (result i32) (i32.const 42))
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).answer()).to.equal(42)
+    expect((await wasm(act)).answer()).to.equal(42)
+  }))
 
 })
