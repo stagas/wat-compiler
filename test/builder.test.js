@@ -12,7 +12,7 @@ async function wasm (binary, imports = {}) {
 
 async function buffers (code, fn) {
   const expected = await wat(code)
-  console.log(expected.log)
+  // console.log(expected.log)
   const actual = fn(new ModuleBuilder()).build()
   return [expected.buffer, actual.buffer]
 }
@@ -757,7 +757,7 @@ describe('start', () => {
 
 describe('if', () => {
   //
-  it.only('dummy function', () => buffers(`
+  it('dummy function', () => buffers(`
     (memory 1)
 
     (func $dummy)

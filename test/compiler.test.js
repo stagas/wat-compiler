@@ -240,7 +240,7 @@ describe('compile', () => {
   }))
 
   //
-  xit('import function', () => buffers(`
+  it('import function', () => buffers(`
     (import "math" "add" (func $add (param i32 i32) (result i32)))
 
     (func (export "call_imported_function") (result i32)
