@@ -306,4 +306,111 @@ describe('compile', () => {
     expect((await wasm(act)).answer()).to.equal(42)
   }))
 
+  //
+  it('block multi', () => buffers(`
+    (func $dummy)
+
+    (func (export "multi") (result i32)
+      (block (call $dummy) (call $dummy) (call $dummy) (call $dummy))
+      (block (result i32) (call $dummy) (call $dummy) (call $dummy) (i32.const 8))
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).multi()).to.equal(8)
+    expect((await wasm(act)).multi()).to.equal(8)
+  }))
+
+  //
+  it('br', () => buffers(`
+    (global $answer (mut i32) (i32.const 42))
+
+    (func $set
+      (global.set $answer (i32.const 666))
+    )
+
+    (func (export "main") (result i32)
+      (block (br 0) (call $set))
+      (global.get $answer)
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).main()).to.equal(42)
+    expect((await wasm(act)).main()).to.equal(42)
+  }))
+
+  //
+  it('br mid', () => buffers(`
+    (global $answer (mut i32) (i32.const 42))
+
+    (func $set
+      (global.set $answer (i32.const 666))
+    )
+
+    (func (export "main") (result i32)
+      (block (call $set) (br 0) (global.set $answer (i32.const 0)))
+      (global.get $answer)
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).main()).to.equal(666)
+    expect((await wasm(act)).main()).to.equal(666)
+  }))
+
+  //
+  it('block named + br', () => buffers(`
+    (global $answer (mut i32) (i32.const 42))
+
+    (func $set
+      (global.set $answer (i32.const 666))
+    )
+
+    (func (export "main") (result i32)
+      (block $outer
+        (block $inner
+          (call $set)
+          (br $inner)
+        )
+        (global.set $answer (i32.const 0))
+      )
+      (global.get $answer)
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).main()).to.equal(0)
+    expect((await wasm(act)).main()).to.equal(0)
+  }))
+
+  //
+  it('block named 2 + br', () => buffers(`
+    (global $answer (mut i32) (i32.const 42))
+
+    (func $set
+      (global.set $answer (i32.const 666))
+    )
+
+    (func (export "main") (result i32)
+      (block $outer
+        (block $inner
+          (call $set)
+          (br $inner)
+        )
+        (block $inner2
+          (global.set $answer (i32.const 444))
+          (br $inner2)
+        )
+        (global.set $answer (i32.const 0))
+      )
+      (global.get $answer)
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).main()).to.equal(0)
+    expect((await wasm(act)).main()).to.equal(0)
+  }))
+
 })
