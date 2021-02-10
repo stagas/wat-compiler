@@ -133,13 +133,13 @@ describe('compile', () => {
 
   //
   it('call function indirect (table) non zero indexed ref types', () => buffers(`
-    (type $return_i64 (func (result i64)))
     (type $return_i32 (func (result i32)))
+    (type $return_i64 (func (result i64)))
 
     (table 2 funcref)
       (elem (i32.const 0) $f1 $f2)
-      (func $xx (result i64)
-        i64.const 42)
+      (func $xx (result i32)
+        i32.const 42)
       (func $f1 (result i32)
         i32.const 42)
       (func $f2 (result i32)
@@ -468,6 +468,218 @@ describe('compile', () => {
     expect((await wasm(act)).main(2)).to.equal(101)
     expect((await wasm(act)).main(3)).to.equal(100)
     expect((await wasm(act)).main(4)).to.equal(104)
+  }))
+
+  //
+  it('loop', () => buffers(`
+    (func (export "main") (result i32)
+      (loop (nop))
+      (loop (result i32) (i32.const 42))
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).main()).to.equal(42)
+    expect((await wasm(act)).main()).to.equal(42)
+  }))
+
+  //
+  it('break-value', () => buffers(`
+    (func (export "main") (result i32)
+      (block (result i32)
+        (loop (result i32) (br 1 (i32.const 18)) (br 0) (i32.const 19))
+      )
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).main()).to.equal(18)
+    expect((await wasm(act)).main()).to.equal(18)
+  }))
+
+  //
+  it('br_if', () => buffers(`
+    (func (export "main") (result i32)
+      (block (result i32)
+        (loop (result i32)
+          (br 1 (i32.const 18))
+          (br 1 (i32.const 19))
+          (drop (br_if 1 (i32.const 20) (i32.const 0)))
+          (drop (br_if 1 (i32.const 20) (i32.const 1)))
+          (br 1 (i32.const 21))
+          (br_table 1 (i32.const 22) (i32.const 0))
+          (br_table 1 1 1 (i32.const 23) (i32.const 1))
+          (i32.const 21)
+        )
+      )
+    )
+
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).main()).to.equal(18)
+    expect((await wasm(act)).main()).to.equal(18)
+  }))
+
+  //
+  it('while', () => buffers(`
+    (func (export "main") (param i32) (result i32)
+      (local i32)
+      (local.set 1 (i32.const 1))
+      (block
+        (loop
+          (br_if 1 (i32.eqz (local.get 0)))
+          (local.set 1 (i32.mul (local.get 0) (local.get 1)))
+          (local.set 0 (i32.sub (local.get 0) (i32.const 1)))
+          (br 0)
+        )
+      )
+      (local.get 1)
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).main()).to.equal(1)
+    expect((await wasm(act)).main()).to.equal(1)
+  }))
+
+  //
+  it('select', () => buffers(`
+    (func (export "main") (result i32)
+      (select (loop (result i32) (i32.const 1)) (i32.const 2) (i32.const 3))
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).main()).to.equal(1)
+    expect((await wasm(act)).main()).to.equal(1)
+  }))
+
+  //
+  it('select mid', () => buffers(`
+    (func (export "main") (result i32)
+      (select (i32.const 2) (loop (result i32) (i32.const 1)) (i32.const 3))
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).main()).to.equal(2)
+    expect((await wasm(act)).main()).to.equal(2)
+  }))
+
+  //
+  it('block labels', () => buffers(`
+    (func (export "main") (result i32)
+      (block $exit (result i32)
+        (br $exit (i32.const 1))
+        (i32.const 0)
+      )
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).main()).to.equal(1)
+    expect((await wasm(act)).main()).to.equal(1)
+  }))
+
+  //
+  it('loop labels', () => buffers(`
+    (func (export "main") (result i32)
+      (local $i i32)
+      (local.set $i (i32.const 0))
+      (block $exit (result i32)
+        (loop $cont (result i32)
+          (local.set $i (i32.add (local.get $i) (i32.const 1)))
+          (if (i32.eq (local.get $i) (i32.const 5))
+            (then (br $exit (local.get $i)))
+          )
+          (br $cont)
+        )
+      )
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).main()).to.equal(5)
+    expect((await wasm(act)).main()).to.equal(5)
+  }))
+
+  //
+  it('loop labels 2', () => buffers(`
+    (func (export "main") (result i32)
+      (local $i i32)
+      (local.set $i (i32.const 0))
+      (block $exit (result i32)
+        (loop $cont (result i32)
+          (local.set $i (i32.add (local.get $i) (i32.const 1)))
+          (if (i32.eq (local.get $i) (i32.const 5))
+            (then (br $cont))
+          )
+          (if (i32.eq (local.get $i) (i32.const 8))
+            (then (br $exit (local.get $i)))
+          )
+          (local.set $i (i32.add (local.get $i) (i32.const 1)))
+          (br $cont)
+        )
+      )
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).main()).to.equal(8)
+    expect((await wasm(act)).main()).to.equal(8)
+  }))
+
+  //
+  it('switch', () => buffers(`
+    (func (export "main") (param i32) (result i32)
+      (block $ret (result i32)
+        (i32.mul (i32.const 10)
+          (block $exit (result i32)
+            (block $0
+              (block $default
+                (block $3
+                  (block $2
+                    (block $1
+                      (br_table $0 $1 $2 $3 $default (local.get 0))
+                    ) ;; 1
+                  ) ;; 2
+                  (br $exit (i32.const 2))
+                ) ;; 3
+                (br $ret (i32.const 3))
+              ) ;; default
+            ) ;; 0
+            (i32.const 5)
+          )
+        )
+      )
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).main(0)).to.equal(50)
+    expect((await wasm(exp)).main(1)).to.equal(20)
+    expect((await wasm(exp)).main(3)).to.equal(3)
+    expect((await wasm(act)).main(0)).to.equal(50)
+    expect((await wasm(act)).main(1)).to.equal(20)
+    expect((await wasm(act)).main(3)).to.equal(3)
+  }))
+
+  //
+  it('label redefinition', () => buffers(`
+    (func (export "main") (result i32)
+      (block $l1 (result i32)
+        (i32.add
+          (block $l1 (result i32) (i32.const 2))
+          (block $l1 (result i32) (br $l1 (i32.const 3)))
+        )
+      )
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).main()).to.equal(5)
+    expect((await wasm(act)).main()).to.equal(5)
   }))
 
 })
