@@ -13,7 +13,7 @@
           [......] - bytecode generator
           [......] - lexer / tokenizer
           [......] - parser
-          [..    ] - compiler
+          [...   ] - compiler
 
         ---------------------------------
         to run the tests:
@@ -195,6 +195,20 @@ stack arguments. I could be wrong though and there
 is some higher structure I'm not seeing yet.
 Anyway, it's a small price to pay so we might
 go for that.
+
+
+update [10 feb 21]:
+~~~~~~~~~~~~~~~~~~~
+
+Woo, late update. Refactored the compiler architecture
+to be more explicit and to better handle function/block
+contexts. Tests are currently broad strokes, but
+planning to insert binaryen's spec tests[0] when the
+all of the primary instructions are in place in order
+to hunt for all possibe edge cases. They are fairly
+exhaustive so that saves us a lot of time!
+
+[0]: https://github.com/WebAssembly/binaryen/tree/main/test/spec
 
 
 
