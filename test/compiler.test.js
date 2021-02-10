@@ -413,4 +413,61 @@ describe('compile', () => {
     expect((await wasm(act)).main()).to.equal(0)
   }))
 
+  //
+  it('br_table', () => buffers(`
+    (func (export "main") (param i32) (result i32)
+      (block
+        (block
+          (br_table 1 0 (local.get 0))
+          (return (i32.const 21))
+        )
+        (return (i32.const 20))
+      )
+      (i32.const 22)
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).main(0)).to.equal(22)
+    expect((await wasm(exp)).main(1)).to.equal(20)
+    expect((await wasm(act)).main(0)).to.equal(22)
+    expect((await wasm(act)).main(1)).to.equal(20)
+  }))
+
+  //
+  it('br_table multiple', () => buffers(`
+    (func (export "main") (param i32) (result i32)
+      (block
+        (block
+          (block
+            (block
+              (block
+                (br_table 3 2 1 0 4 (local.get 0))
+                (return (i32.const 99))
+              )
+              (return (i32.const 100))
+            )
+            (return (i32.const 101))
+          )
+          (return (i32.const 102))
+        )
+        (return (i32.const 103))
+      )
+      (i32.const 104)
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).main(0)).to.equal(103)
+    expect((await wasm(exp)).main(1)).to.equal(102)
+    expect((await wasm(exp)).main(2)).to.equal(101)
+    expect((await wasm(exp)).main(3)).to.equal(100)
+    expect((await wasm(exp)).main(4)).to.equal(104)
+    expect((await wasm(act)).main(0)).to.equal(103)
+    expect((await wasm(act)).main(1)).to.equal(102)
+    expect((await wasm(act)).main(2)).to.equal(101)
+    expect((await wasm(act)).main(3)).to.equal(100)
+    expect((await wasm(act)).main(4)).to.equal(104)
+  }))
+
 })

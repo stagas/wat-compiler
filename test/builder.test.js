@@ -779,11 +779,11 @@ describe('if', () => {
     .func('store', ['i32'], [],
       [],
       [
-        ...INSTR.if([...INSTR.type.i32()], [local.get(0)]),
-          ...INSTR.call(mod.getFunc('dummy')),
+        ...INSTR.if([INSTR.type.i32()], [local.get(0)]),
+          ...INSTR.call(mod.getFunc('dummy').idx),
           ...i32.const(1),
         ...INSTR.else(),
-          ...INSTR.call(mod.getFunc('dummy')),
+          ...INSTR.call(mod.getFunc('dummy').idx),
           ...i32.const(0),
         ...INSTR.end(),
 
