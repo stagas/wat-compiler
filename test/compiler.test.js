@@ -682,4 +682,43 @@ describe('compile', () => {
     expect((await wasm(act)).main()).to.equal(5)
   }))
 
+  //
+  it('address', () => buffers(`
+    (memory 1)
+    (data (i32.const 0) "abcdefghijklmnopqrstuvwxyz")
+
+    (func (export "a") (param $i i32) (result i32)
+      (i32.load8_u offset=0 (local.get $i))                   ;; 97 'a'
+    )
+
+    (func (export "b") (param $i i32) (result i32)
+      (i32.load8_u offset=1 align=1 (local.get $i))           ;; 98 'b'
+    )
+
+    (func (export "ab") (param $i i32) (result i32)
+      (i32.load16_s offset=0 (local.get $i))                  ;; 25185 'ab'
+    )
+
+    (func (export "cd") (param $i i32) (result i32)
+      (i32.load16_u offset=2 align=2 (local.get $i))          ;; 25699 'cd'
+    )
+
+    (func (export "z") (param $i i32) (result i32)
+      (i32.load8_s offset=25 align=1 (local.get $i))          ;; 122 'z'
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).a()).to.equal(97)
+    expect((await wasm(exp)).b()).to.equal(98)
+    expect((await wasm(exp)).ab()).to.equal(25185)
+    expect((await wasm(exp)).cd()).to.equal(25699)
+    expect((await wasm(exp)).z()).to.equal(122)
+
+    expect((await wasm(act)).a()).to.equal(97)
+    expect((await wasm(act)).b()).to.equal(98)
+    expect((await wasm(act)).ab()).to.equal(25185)
+    expect((await wasm(act)).cd()).to.equal(25699)
+    expect((await wasm(act)).z()).to.equal(122)
+  }))
 })
