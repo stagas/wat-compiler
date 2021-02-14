@@ -741,6 +741,7 @@ describe('compile', () => {
     'raytrace',
     'snake',
     'maze',
+    'dino',
   ]
 
   e2e.forEach(name => {
