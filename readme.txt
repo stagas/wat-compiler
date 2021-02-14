@@ -227,9 +227,10 @@ plus better error handling.
 Nevertheless, it's in a good state at the moment so
 I added a build version if anyone wants to play with
 it and also to see what the overhead is at the moment.
-Right now it's at 29kb (15kb minified) and cold
-compilation for a semi-complex file is 100x compared
-to wabt (~100ms vs ~1ms) and about 10x faster when hot.
+Right now it's at 29kb (15kb minified, 5kb gzipped)
+and cold compilation for a semi-complex file is 100x
+faster compared to wabt (~100ms vs ~1ms) and about
+10x faster when hot.
 
 
 +--------------------------------------------------+

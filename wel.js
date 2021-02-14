@@ -642,8 +642,6 @@ var GlobalContext = class {
         index = this.globals.map((x) => x.name).lastIndexOf(name);
       }
     }
-    if (index === -1)
-      console.log(name, instr2);
     return index;
   }
 };
@@ -651,14 +649,14 @@ function compile(node) {
   const m = new builder_default();
   const g = new GlobalContext();
   const deferred = [];
-  function cast(param, context) {
+  function cast(param, context, instr2) {
     switch (param.kind) {
       case "number":
         return param.value === "inf" ? Infinity : param.value === "nan" ? NaN : parseFloat(param.value);
       case "hex":
         return param.value.length > 10 ? BigInt(param.value) : parseInt(param.value);
       case "label":
-        return context.lookup(param.value);
+        return context.lookup(param.value, instr2);
       default:
         return param.value;
     }
@@ -667,11 +665,20 @@ function compile(node) {
     locals = [];
     depth = [];
     lookup(name, instr2) {
-      let index = this.locals.lastIndexOf(name);
-      if (!~index) {
-        index = this.depth.lastIndexOf(name);
-        if (~index)
-          index = this.depth.length - 1 - index;
+      let index;
+      switch (instr2) {
+        case "br":
+        case "br_table":
+        case "br_if":
+          {
+            index = this.depth.lastIndexOf(name);
+            if (~index)
+              index = this.depth.length - 1 - index;
+          }
+          break;
+        default: {
+          index = this.locals.lastIndexOf(name);
+        }
       }
       if (!~index)
         index = g.lookup(name, instr2);
@@ -706,7 +713,7 @@ function compile(node) {
           address.align = 4;
       case "i64.store":
         if (instr2 === "i64.store")
-          address.align = 4;
+          address.align = 6;
       case "i32.store":
         if (instr2 === "i32.store")
           address.align = 4;
@@ -719,6 +726,9 @@ function compile(node) {
       case "f32.load":
         if (instr2 === "f32.load")
           address.align = 4;
+      case "i64.load":
+        if (instr2 === "i64.load")
+          address.align = 6;
       case "i32.load":
         if (instr2 === "i32.load")
           address.align = 4;
@@ -844,11 +854,11 @@ function compile(node) {
         if (node2.name) {
           node2.params.unshift({
             param: {
-              value: context.lookup(node2.name.value)
+              value: context.lookup(node2.name.value, instr2)
             }
           });
         }
-        const args = node2.params.map((x) => cast(x.param, context));
+        const args = node2.params.map((x) => cast(x.param, context, node2.instr.value));
         const expr = node2.children.flatMap((x) => evaluate(x, context));
         return bytes(instr2, [args.length - 1, ...args], expr);
       }
