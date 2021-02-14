@@ -6,7 +6,9 @@ export default async function compile (code) {
     wabt = await Wabt()
   }
 
-  const parsed = await wabt.parseWat('inline', new TextEncoder('utf-8').encode(code))
+  const parsed = await wabt.parseWat('inline', new TextEncoder('utf-8').encode(code), {
+    bulk_memory: true,
+  })
   console.time('wat build')
   const binary = parsed.toBinary({
     log: true,

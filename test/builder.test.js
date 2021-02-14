@@ -609,7 +609,7 @@ describe('memory + data', () => {
 
   `, mod => mod
 
-    .memory(1)
+    .memory(null, 1)
 
     .data([...i32.const(0)], [0x2a])
 
@@ -645,7 +645,7 @@ describe('memory + data', () => {
 
   `, mod => mod
 
-    .memory(1, 2)
+    .memory(null, 1, 2)
 
     .data([...i32.const(0)], [0x2a])
 
@@ -772,7 +772,7 @@ describe('if', () => {
     )
   `, mod => mod
 
-    .memory(1)
+    .memory(null, 1)
 
     .func('dummy')
 
