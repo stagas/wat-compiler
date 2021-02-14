@@ -901,7 +901,7 @@ describe('compile', () => {
 
     ;; loop through all blocks
     (local.set $ptr (i32.const 0))
-    (loop $search
+    loop $search
       ;; we reached the end of heap and haven't found anything, return NULL
       (if (i32.lt_u (local.get $ptr) (global.get $max_addr))(then)(else
         (i32.const 0)
@@ -974,7 +974,7 @@ describe('compile', () => {
         (local.set $ptr (i32.add (local.get $ptr) (i32.add (local.get $size) (i32.const 8))))
         (br $search)
       ))
-    )
+    end
 
     ;; theoratically we will not reach here
     ;; return NULL
@@ -1098,13 +1098,13 @@ describe('compile', () => {
     (local $data i32)
     (local.set $offset (i32.const 0))
 
-    (loop $cpy
+    loop $cpy
       (local.set $data (i32.load8_u (i32.add (local.get $src) (local.get $offset))))
       (i32.store8 (i32.add (local.get $dst) (local.get $offset)) (local.get $data))
 
       (local.set $offset (i32.add (local.get $offset) (i32.const 1)))
       (br_if $cpy (i32.lt_u (local.get $offset) (local.get $n_bytes)))
-    )
+    end
   )
 
   ;; reallocate memory to new size
