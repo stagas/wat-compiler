@@ -13,7 +13,7 @@
           [......] - bytecode generator
           [......] - lexer / tokenizer
           [......] - parser
-          [...   ] - compiler
+          [..... ] - compiler
 
         ---------------------------------
         to run the tests:
@@ -210,6 +210,26 @@ exhaustive so that saves us a lot of time!
 
 [0]: https://github.com/WebAssembly/binaryen/tree/main/test/spec
 
+
+update [14 feb 21]:
+~~~~~~~~~~~~~~~~~~~
+
+Finally is able to compile real life WAT projects,
+though there are still cases where it would probably
+fail, especially when handling data and various numeric
+types encoding and addresses. To solve these properly
+we should create separate test suites, I deferred this
+task because I didn't have the knowledge to solve it,
+which I think I do now. Will probably insert it along
+with a small generic refactor since there are some
+low-hanging fruit that are screaming for improvement,
+plus better error handling.
+Nevertheless, it's in a good state at the moment so
+I added a build version if anyone wants to play with
+it and also to see what the overhead is at the moment.
+Right now it's at 29kb (15kb minified) and cold
+compilation for a semi-complex file is 100x compared
+to wabt (~100ms vs ~1ms) and about 10x faster when hot.
 
 
 +--------------------------------------------------+
