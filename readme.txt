@@ -5,7 +5,8 @@
 
                      -=-
 
-         a wannabe webassembly something
+           webassembly wat text format
+               to binary compiler
 
         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         progress:
