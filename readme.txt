@@ -242,4 +242,5 @@ to wabt (~100ms vs ~1ms) and about 10x faster when hot.
   Wax    - https://github.com/LingDong-/wax
   Never  - https://never-lang.readthedocs.io/
   chibicc - https://github.com/rui314/chibicc
+  Raw Wasm - https://github.com/binji/raw-wasm
   AssemblyScript - https://www.assemblyscript.org/
