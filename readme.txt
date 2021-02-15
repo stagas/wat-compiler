@@ -14,7 +14,7 @@
           [......] - bytecode generator
           [......] - lexer / tokenizer
           [......] - parser
-          [..... ] - compiler
+          [......] - compiler
 
         ---------------------------------
         to run the tests:
@@ -232,6 +232,21 @@ Right now it's at 29kb (15kb minified, 5kb gzipped)
 and cold compilation for a semi-complex file is 100x
 faster compared to wabt (~100ms vs ~1ms) and about
 10x faster when hot.
+
+
+update [15 feb 21]:
+~~~~~~~~~~~~~~~~~~~
+
+I declare the compiler complete ! :D
+Ok, it's missing some work on data literals (u8 i8 etc)
+but there is no way to test as wabt doesn't even
+support them so nothing to compare. Let's add this
+in the future, otherwise it successfully compiles
+plenty of real life projects so it's good for now.
+Might do a small refactor now that everything is passing,
+but anyways I am happy with this experiment.
+Next big steps are building something higher level,
+which I have no idea yet.
 
 
 +--------------------------------------------------+

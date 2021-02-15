@@ -1,5 +1,5 @@
 // lib/lexer.js
-var regexp = /(?<comment>;;.*|\(;[^]*?;\))|"(?<string>(?:\\"|[^"])*?)"|(?<param>offset|align|shared|funcref)=?|(?<hex>(nan:)?[+-]?0x[0-9a-f.p+-_]+)|(?<number>[+-]?inf|nan|[+-]?\d[\d.e_+-]*)|(?<instr>[a-z][a-z0-9!#$%&'*+\-./:<=>?@\\^_`|~]+)|\$(?<label>[a-z0-9!#$%&'*+\-./:<=>?@\\^_`|~]+)|(?<lparen>\()|(?<rparen>\))|(?<nul>[ \t\n]+)|(?<error>.)/gi;
+var regexp = /(?<comment>;;.*|\(;[^]*?;\))|"(?<string>(?:\\"|[^"])*?)"|(?<param>offset|align|shared|funcref)=?|(?<hex>([+-]?nan:)?[+-]?0x[0-9a-f.p+-_]+)|(?<number>[+-]?inf|[+-]?nan|[+-]?\d[\d.e_+-]*)|(?<instr>[a-z][a-z0-9!#$%&'*+\-./:<=>?@\\^_`|~]+)|\$(?<label>[a-z0-9!#$%&'*+\-./:<=>?@\\^_`|~]+)|(?<lparen>\()|(?<rparen>\))|(?<nul>[ \t\n]+)|(?<error>.)/gi;
 function tokenize(input) {
   let last = {};
   let curr = {};
@@ -63,6 +63,7 @@ function tokenize(input) {
 
 // lib/leb128.js
 function* bigint(n) {
+  n = to_int64(n);
   while (true) {
     const byte = Number(n & 0x7Fn);
     n >>= 7n;
@@ -104,7 +105,11 @@ function* uint(value, pad = 0) {
     pad--;
   } while (value != 0 || pad > -1);
 }
-var byteView = new DataView(new Float64Array(1).buffer);
+var byteView = new DataView(new BigInt64Array(1).buffer);
+function to_int64(value) {
+  byteView.setBigInt64(0, value);
+  return byteView.getBigInt64(0);
+}
 function* f32(value) {
   byteView.setFloat32(0, value);
   for (let i = 4; i--; )
@@ -112,6 +117,65 @@ function* f32(value) {
 }
 function* f64(value) {
   byteView.setFloat64(0, value);
+  for (let i = 8; i--; )
+    yield byteView.getUint8(i);
+}
+function hex2float(input) {
+  input = input.toUpperCase();
+  const splitIndex = input.indexOf("P");
+  let mantissa, exponent;
+  if (splitIndex !== -1) {
+    mantissa = input.substring(0, splitIndex);
+    exponent = parseInt(input.substring(splitIndex + 1));
+  } else {
+    mantissa = input;
+    exponent = 0;
+  }
+  const dotIndex = mantissa.indexOf(".");
+  if (dotIndex !== -1) {
+    let integerPart = parseInt(mantissa.substring(0, dotIndex), 16);
+    const sign = Math.sign(integerPart);
+    integerPart = sign * integerPart;
+    const fractionLength = mantissa.length - dotIndex - 1;
+    const fractionalPart = parseInt(mantissa.substring(dotIndex + 1), 16);
+    const fraction = fractionLength > 0 ? fractionalPart / Math.pow(16, fractionLength) : 0;
+    if (sign === 0) {
+      if (fraction === 0) {
+        mantissa = sign;
+      } else {
+        if (Object.is(sign, -0)) {
+          mantissa = -fraction;
+        } else {
+          mantissa = fraction;
+        }
+      }
+    } else {
+      mantissa = sign * (integerPart + fraction);
+    }
+  } else {
+    mantissa = parseInt(mantissa, 16);
+  }
+  return mantissa * (splitIndex !== -1 ? Math.pow(2, exponent) : 1);
+}
+var F32_SIGN = 2147483648;
+var F32_NAN = 2139095040;
+function* nanbox32(input) {
+  let value = parseInt(input.split("nan:")[1]);
+  value |= F32_NAN;
+  if (input[0] === "-")
+    value |= F32_SIGN;
+  byteView.setInt32(0, value);
+  for (let i = 4; i--; )
+    yield byteView.getUint8(i);
+}
+var F64_SIGN = 0x8000000000000000n;
+var F64_NAN = 0x7ff0000000000000n;
+function* nanbox64(input) {
+  let value = BigInt(input.split("nan:")[1]);
+  value |= F64_NAN;
+  if (input[0] === "-")
+    value |= F64_SIGN;
+  byteView.setBigInt64(0, value);
   for (let i = 8; i--; )
     yield byteView.getUint8(i);
 }
@@ -361,6 +425,31 @@ for (const op in BYTE) {
     INSTR[group][method] = wrap_instr(op);
   }
 }
+var ALIGN = {
+  "i32.load": 4,
+  "i64.load": 8,
+  "f32.load": 4,
+  "f64.load": 8,
+  "i32.load8_s": 1,
+  "i32.load8_u": 1,
+  "i32.load16_s": 2,
+  "i32.load16_u": 2,
+  "i64.load8_s": 1,
+  "i64.load8_u": 1,
+  "i64.load16_s": 2,
+  "i64.load16_u": 2,
+  "i64.load32_s": 4,
+  "i64.load32_u": 4,
+  "i32.store": 4,
+  "i64.store": 8,
+  "f32.store": 4,
+  "f64.store": 8,
+  "i32.store8": 1,
+  "i32.store16": 2,
+  "i64.store8": 1,
+  "i64.store16": 2,
+  "i64.store32": 4
+};
 
 // lib/binary.js
 function wrap_instr(code) {
@@ -642,19 +731,52 @@ var GlobalContext = class {
         index = this.globals.map((x) => x.name).lastIndexOf(name);
       }
     }
-    return index;
+    return uint(index);
   }
 };
 function compile(node) {
   const m = new builder_default();
   const g = new GlobalContext();
   const deferred = [];
-  function cast(param, context, instr2) {
+  function cast(param, context = g, instr2 = "i32") {
     switch (param.kind) {
-      case "number":
-        return param.value === "inf" ? Infinity : param.value === "nan" ? NaN : parseFloat(param.value);
-      case "hex":
-        return param.value.length > 10 ? BigInt(param.value) : parseInt(param.value);
+      case "number": {
+        if (param.value === "inf" || param.value === "+inf") {
+          return Infinity;
+        } else if (param.value === "-inf") {
+          return -Infinity;
+        } else if (param.value === "nan" || param.value === "+nan") {
+          return NaN;
+        } else if (param.value === "-nan") {
+          return NaN;
+        } else if (instr2?.[0] === "f") {
+          return parseFloat(param.value);
+        }
+      }
+      case "hex": {
+        let value;
+        if (instr2.indexOf("i64") === 0) {
+          if (param.value[0] === "-") {
+            value = -BigInt(param.value.slice(1));
+          } else {
+            value = BigInt(param.value);
+          }
+          return value;
+        } else if (instr2[0] === "f") {
+          if (param.value.indexOf("nan") >= 0) {
+            if (instr2.indexOf("f32") === 0) {
+              value = nanbox32(param.value);
+            } else {
+              value = nanbox64(param.value);
+            }
+          } else {
+            value = hex2float(param.value);
+          }
+          return value;
+        } else {
+          return parseInt(param.value);
+        }
+      }
       case "label":
         return context.lookup(param.value, instr2);
       default:
@@ -708,46 +830,34 @@ function compile(node) {
         const expr = node2.children.flatMap((x) => evaluate(x, context));
         return bytes(instr2, args, expr);
       }
-      case "f32.store":
-        if (instr2 === "f32.store")
-          address.align = 4;
-      case "i64.store":
-        if (instr2 === "i64.store")
-          address.align = 6;
-      case "i32.store":
-        if (instr2 === "i32.store")
-          address.align = 4;
-      case "i32.store8":
-        if (instr2 === "i32.store8")
-          address.align = 0;
-      case "i32.store16":
-        if (instr2 === "i32.store16")
-          address.align = 2;
-      case "f32.load":
-        if (instr2 === "f32.load")
-          address.align = 4;
-      case "i64.load":
-        if (instr2 === "i64.load")
-          address.align = 6;
       case "i32.load":
-        if (instr2 === "i32.load")
-          address.align = 4;
-      case "i32.load16_s":
-        if (instr2 === "i32.load16_s")
-          address.align = 2;
-      case "i32.load16_u":
-        if (instr2 === "i32.load16_u")
-          address.align = 2;
+      case "i64.load":
+      case "f32.load":
+      case "f64.load":
       case "i32.load8_s":
-        if (instr2 === "i32.load8_s")
-          address.align = 0;
-      case "i32.load8_u": {
-        if (instr2 === "i32.load8_u")
-          address.align = 0;
+      case "i32.load8_u":
+      case "i32.load16_s":
+      case "i32.load16_u":
+      case "i64.load8_s":
+      case "i64.load8_u":
+      case "i64.load16_s":
+      case "i64.load16_u":
+      case "i64.load32_s":
+      case "i64.load32_u":
+      case "i32.store":
+      case "i64.store":
+      case "f32.store":
+      case "f64.store":
+      case "i32.store8":
+      case "i32.store16":
+      case "i64.store8":
+      case "i64.store16":
+      case "i64.store32": {
+        address.align = ALIGN[instr2];
         for (const p of node2.params) {
           address[p.param.value] = cast(p.value);
         }
-        const args = [address.align / 2, address.offset].map((x) => {
+        const args = [Math.log2(address.align), address.offset].map((x) => {
           if (typeof x === "number")
             return uint(x);
           else if (typeof x === "bigint")
@@ -858,7 +968,7 @@ function compile(node) {
             }
           });
         }
-        const args = node2.params.map((x) => cast(x.param, context, node2.instr.value));
+        const args = node2.params.map((x) => cast(x.param, context, instr2));
         const expr = node2.children.flatMap((x) => evaluate(x, context));
         return bytes(instr2, [args.length - 1, ...args], expr);
       }
@@ -870,7 +980,7 @@ function compile(node) {
             }
           });
         }
-        const args = node2.params.map((x) => cast(x.param));
+        const args = node2.params.map((x) => cast(x.param, context, instr2));
         const expr = node2.children.flatMap((x) => evaluate(x, context));
         return bytes(instr2, args, expr);
       }
