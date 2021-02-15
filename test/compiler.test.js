@@ -877,6 +877,8 @@ describe('compile', () => {
   // e2e
   const e2e = [
     'malloc',
+    'brownian',
+    'containers',
     'quine',
     'fire',
     'metaball',
