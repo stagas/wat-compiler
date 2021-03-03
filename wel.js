@@ -409,10 +409,41 @@ var opCodes = [
   "f32.reinterpret_i32",
   "f64.reinterpret_i64"
 ];
+var alias = {
+  get_local: "local.get",
+  set_local: "local.set",
+  tee_local: "local.tee",
+  get_global: "global.get",
+  set_global: "global.set",
+  "i32.trunc_s/f32": "i32.trunc_f32_s",
+  "i32.trunc_u/f32": "i32.trunc_f32_u",
+  "i32.trunc_s/f64": "i32.trunc_f64_s",
+  "i32.trunc_u/f64": "i32.trunc_f64_u",
+  "i64.extend_s/i32": "i64.extend_i32_s",
+  "i64.extend_u/i32": "i64.extend_i32_u",
+  "i64.trunc_s/f32": "i64.trunc_f32_s",
+  "i64.trunc_u/f32": "i64.trunc_f32_u",
+  "i64.trunc_s/f64": "i64.trunc_f64_s",
+  "i64.trunc_u/f64": "i64.trunc_f64_u",
+  "f32.convert_s/i32": "f32.convert_i32_s",
+  "f32.convert_u/i32": "f32.convert_i32_u",
+  "f32.convert_s/i64": "f32.convert_i64_s",
+  "f32.convert_u/i64": "f32.convert_i64_u",
+  "f32.demote/f64": "f32.demote_f64",
+  "f64.convert_s/i32": "f64.convert_i32_s",
+  "f64.convert_u/i32": "f64.convert_i32_u",
+  "f64.convert_s/i64": "f64.convert_i64_s",
+  "f64.convert_u/i64": "f64.convert_i64_u",
+  "f64.promote/f32": "f64.promote_f32"
+};
 for (const [i, op] of opCodes.entries()) {
   if (op != null) {
     BYTE[op] = i;
   }
+}
+for (const name in alias) {
+  const i = opCodes.indexOf(alias[name]);
+  BYTE[name] = i;
 }
 var INSTR = {};
 for (const op in BYTE) {
@@ -803,8 +834,8 @@ function compile(node) {
         }
       }
       if (!~index)
-        index = g.lookup(name, instr2);
-      return index;
+        return g.lookup(name, instr2);
+      return uint(index);
     }
   }
   function bytes(instr2, args, expr) {
@@ -1152,12 +1183,13 @@ function parse({start, peek, accept, expect}) {
       const str = accept("string");
       if (!str)
         break;
-      if (str.value[0] === "\\") {
+      if (str.value[0] === "\\" && str.value[1].match(/[0-9a-f]/i)) {
         const match = str.value.matchAll(/\\([0-9a-f]{1,2})/gi);
         for (const m of match) {
           parsed.push(parseInt(m[1], 16));
         }
       } else {
+        str.value = str.value.replace(/\\n/, "\n");
         parsed.push(...encoder2.encode(str.value));
       }
     }
@@ -1245,7 +1277,7 @@ function parse({start, peek, accept, expect}) {
 
 // index.js
 function wel_default(code) {
-  return compile(parse(tokenize("(module " + code + ")"))).build();
+  return compile(parse(tokenize("(module " + code + ")")));
 }
 export {
   wel_default as default
