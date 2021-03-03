@@ -886,6 +886,7 @@ describe('compile', () => {
     'snake',
     'maze',
     'dino',
+    'raycast',
   ]
 
   e2e.forEach(name => {
