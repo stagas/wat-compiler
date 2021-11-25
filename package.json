@@ -1,0 +1,19 @@
+{
+  "name": "wel",
+  "version": "1.0.0",
+  "description": "webassembly wat text format to binary compiler",
+  "main": "index.js",
+  "types": "./index.d.ts",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "make test"
+  },
+  "author": "",
+  "license": "Public Domain",
+  "devDependencies": {
+    "eslint": "^8.3.0"
+  }
+}
