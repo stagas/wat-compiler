@@ -12,7 +12,7 @@ async function wasm (binary, imports = {}) {
 async function buffers (code) {
   const expected = await wat(code)
   // console.log(expected.log)
-  const actual = compile(parse(tokenize('(module '+code+')')))
+  const actual = compile(parse(tokenize('(module '+code+')'))).build()
   return [expected.buffer, actual.buffer]
 }
 
