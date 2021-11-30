@@ -15,6 +15,7 @@ module.exports = {
         "no-sparse-arrays": "off",
         "no-fallthrough": "off",
         "no-constant-condition": "off",
-        "no-cond-assign": "off"
+        "no-cond-assign": "off",
+        "no-extra-semi": "off"
     }
 };

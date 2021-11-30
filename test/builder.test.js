@@ -1,5 +1,5 @@
 import ModuleBuilder from '../lib/builder.js'
-import { INSTR, BYTE } from '../lib/const.js'
+import { INSTR } from '../lib/const.js'
 import { hexAssertEqual } from './util/hex.js'
 import wat from './util/wat.js'
 
