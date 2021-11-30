@@ -21,6 +21,17 @@ async function buffers (code, fn) {
 //
 //
 
+describe('(module)', () => {
+  //
+  it(`(module)`, () => buffers(`
+
+  (module)
+
+  `, mod => mod
+
+  ).then(([exp,act]) => hexAssertEqual(exp,act)))
+})
+
 describe('function declaration', () => {
   //
   it(`1 function
@@ -701,6 +712,54 @@ describe('imports', () => {
     expect((await wasm(exp, { math })).call_imported_function()).to.equal(42)
     expect((await wasm(act, { math })).call_imported_function()).to.equal(42)
   }))
+
+  //
+  it('import memory min 1 max 2', () => buffers(`
+
+    (import "env" "mem" (memory 1 2))
+
+  `, mod => mod
+
+    .import('memory', 'env.mem', 'env', 'mem', [1,2])
+
+  )
+  .then(([exp,act]) => hexAssertEqual(exp,act)))
+
+  //
+  it('import memory min 1 max 2', () => buffers(`
+
+    (import "env" "mem" (memory 1 2 shared))
+
+  `, mod => mod
+
+    .import('memory', 'env.mem', 'env', 'mem', [1,2,true])
+
+  )
+  .then(([exp,act]) => hexAssertEqual(exp,act)))
+
+  //
+  it('import memory min 3', () => buffers(`
+
+    (import "env" "mem" (memory 3))
+
+  `, mod => mod
+
+    .import('memory', 'env.mem', 'env', 'mem', [3])
+
+  )
+  .then(([exp,act]) => hexAssertEqual(exp,act)))
+
+  //
+  it('import memory min 3 max 3', () => buffers(`
+
+    (import "env" "mem" (memory 3 3))
+
+  `, mod => mod
+
+    .import('memory', 'env.mem', 'env', 'mem', [3,3])
+
+  )
+  .then(([exp,act]) => hexAssertEqual(exp,act)))
 })
 
 //
