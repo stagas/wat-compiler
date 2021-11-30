@@ -265,6 +265,30 @@ describe('compile', () => {
   }))
 
   //
+  it('import memory 1', () => buffers(`
+    (import "env" "mem" (memory 1))
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act)))
+
+  //
+  it('import memory 1 2', () => buffers(`
+    (import "env" "mem" (memory 1 2))
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act)))
+
+  //
+  it('import memory 1 2 shared', () => buffers(`
+    (import "env" "mem" (memory 1 2 shared))
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act)))
+
+  //
+  it('import memory $foo 1 2 shared', () => buffers(`
+    (import "env" "mem" (memory $foo 1 2 shared))
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act)))
+
+  //
   it('set a start function', () => buffers(`
     (global $answer (mut i32) (i32.const 42))
 
