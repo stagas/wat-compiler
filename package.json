@@ -2,12 +2,12 @@
   "name": "wat-compiler",
   "version": "0.1.0",
   "description": "webassembly wat text format to binary compiler",
-  "main": "index.js",
+  "main": "./dist/cjs/index.js",
   "types": "./index.d.ts",
   "exports": {
     ".": {
-      "import": "./index.js",
-      "require": "./dist/index.js"
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
     }
   },
   "directories": {
@@ -21,7 +21,9 @@
     "index.d.ts"
   ],
   "scripts": {
-    "build": "esbuild --outdir=dist --format=cjs --bundle ./index.js",
+    "build": "rimraf dist && npm run build:esm && npm run build:cjs",
+    "build:esm": "esbuild --outdir=dist/esm --format=esm --bundle ./index.js --sourcemap && echo '{\"type\":\"module\"}' >dist/esm/package.json",
+    "build:cjs": "esbuild --outdir=dist/cjs --format=cjs --bundle ./index.js --sourcemap",
     "test": "make test",
     "prepack": "echo todo prepack",
     "lint": "echo todo lint",
@@ -32,7 +34,8 @@
   "devDependencies": {
     "documentation": "github:documentationjs/documentation",
     "esbuild": "^0.14.2",
-    "eslint": "^8.3.0"
+    "eslint": "^8.3.0",
+    "rimraf": "^3.0.2"
   },
   "short": "stagas/wat-compiler",
   "repository": {
