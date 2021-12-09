@@ -1,5 +1,14 @@
 // lib/lexer.js
-var regexp = /(?<comment>;;.*|\(;[^]*?;\))|"(?<string>(?:\\"|[^"])*?)"|(?<param>offset|align|shared|funcref)=?|(?<hex>([+-]?nan:)?[+-]?0x[0-9a-f.p+-_]+)|(?<number>[+-]?inf|[+-]?nan|[+-]?\d[\d.e_+-]*)|(?<instr>[a-z][a-z0-9!#$%&'*+\-./:<=>?@\\^_`|~]+)|\$(?<label>[a-z0-9!#$%&'*+\-./:<=>?@\\^_`|~]+)|(?<lparen>\()|(?<rparen>\))|(?<nul>[ \t\n]+)|(?<error>.)/gi;
+var regexp = new RegExp([
+  /(?<comment>;;.*|\(;[^]*?;\))/,
+  /"(?<string>(?:\\"|[^"])*?)"/,
+  /(?<param>offset|align|shared|funcref)=?/,
+  /(?<hex>([+-]?nan:)?[+-]?0x[0-9a-f.p+-_]+)/,
+  /(?<number>[+-]?inf|[+-]?nan|[+-]?\d[\d.e_+-]*)/,
+  /(?<instr>[a-z][a-z0-9!#$%&'*+\-./:<=>?@\\^_`|~]+)/,
+  /\$(?<label>[a-z0-9!#$%&'*+\-./:<=>?@\\^_`|~]+)/,
+  /(?<lparen>\()|(?<rparen>\))|(?<nul>[ \t\n]+)|(?<error>.)/
+].map((x) => x.toString().slice(1, -1)).join("|"), "gi");
 function tokenize(input) {
   let last = {};
   let curr = {};
@@ -7,9 +16,9 @@ function tokenize(input) {
   function next() {
     const match = matches.next();
     if (match.done)
-      return {value: {value: null, kind: "eof", index: input.length}, done: true};
+      return { value: { value: null, kind: "eof", index: input.length }, done: true };
     const [kind, value] = Object.entries(match.value.groups).filter((e) => e[1] != null)[0];
-    return {value: {value, kind, index: match.value.index}, done: false};
+    return { value: { value, kind, index: match.value.index }, done: false };
   }
   function advance() {
     last = curr;
@@ -59,6 +68,107 @@ function tokenize(input) {
     start: advance
   };
   return iterator;
+}
+
+// lib/parser.js
+function parse({ start, peek, accept, expect }) {
+  const encoder2 = new TextEncoder("utf-8");
+  function parseDataString() {
+    const parsed = [];
+    while (1) {
+      const str = accept("string");
+      if (!str)
+        break;
+      if (str.value[0] === "\\" && str.value[1].match(/[0-9a-f]/i)) {
+        const match = str.value.matchAll(/\\([0-9a-f]{1,2})/gi);
+        for (const m of match) {
+          parsed.push(parseInt(m[1], 16));
+        }
+      } else {
+        str.value = str.value.replace(/\\n/, "\n");
+        parsed.push(...encoder2.encode(str.value));
+      }
+    }
+    return parsed;
+  }
+  function* params() {
+    let param;
+    while (1) {
+      if (param = accept("number")) {
+        param.value = param.value.replace(/_/g, "");
+        yield { param };
+        continue;
+      }
+      if (param = accept("hex")) {
+        param.value = param.value.replace(/_/g, "");
+        yield { param };
+        continue;
+      }
+      if (param = accept("string")) {
+        yield { param };
+        continue;
+      }
+      if (param = accept("label")) {
+        yield { param };
+        continue;
+      }
+      if (param = accept("param")) {
+        let value;
+        if (value = accept("number")) {
+          yield { param, value };
+          continue;
+        }
+        if (value = accept("hex")) {
+          yield { param, value };
+          continue;
+        } else {
+          yield { param };
+          continue;
+        }
+      }
+      break;
+    }
+  }
+  function expr() {
+    const ref = accept("label");
+    if (ref)
+      return { ref };
+    if (peek("string")) {
+      return { data: parseDataString() };
+    }
+    const sexpr = accept("lparen");
+    let instr2;
+    if (sexpr) {
+      instr2 = expect("instr");
+    } else {
+      instr2 = accept("instr");
+      if (!instr2)
+        return;
+    }
+    const node = {
+      instr: instr2,
+      name: accept("label"),
+      params: [...params()],
+      children: []
+    };
+    if (sexpr) {
+      let child;
+      while (!peek("eof") && (child = expr())) {
+        node.children.push(child);
+      }
+      node.params.push(...params());
+      expect("rparen");
+    } else if (instr2.value === "block" || instr2.value === "loop") {
+      let child;
+      while (!peek("eof") && !peek("instr", "end") && (child = expr())) {
+        node.children.push(child);
+      }
+      expect("instr", "end");
+    }
+    return node;
+  }
+  start();
+  return expr();
 }
 
 // lib/leb128.js
@@ -213,7 +323,8 @@ var BYTE = {
   "global.var": 1,
   "global.mut": 1,
   "limits.min": 0,
-  "limits.minmax": 1
+  "limits.minmax": 1,
+  "limits.shared": 3
 };
 var opCodes = [
   "unreachable",
@@ -410,11 +521,11 @@ var opCodes = [
   "f64.reinterpret_i64"
 ];
 var alias = {
-  get_local: "local.get",
-  set_local: "local.set",
-  tee_local: "local.tee",
-  get_global: "global.get",
-  set_global: "global.set",
+  "get_local": "local.get",
+  "set_local": "local.set",
+  "tee_local": "local.tee",
+  "get_global": "global.get",
+  "set_global": "global.set",
   "i32.trunc_s/f32": "i32.trunc_f32_s",
   "i32.trunc_u/f32": "i32.trunc_f32_u",
   "i32.trunc_s/f64": "i32.trunc_f64_s",
@@ -546,8 +657,10 @@ function locals(items) {
     out.push([...uint(curr.length), BYTE.type[curr[0]]]);
   return out;
 }
-function limits(min, max) {
-  if (max != null) {
+function limits(min, max, shared) {
+  if (shared != null) {
+    return [BYTE.limits.shared, ...uint(min), ...uint(max)];
+  } else if (max != null) {
     return [BYTE.limits.minmax, ...uint(min), ...uint(max)];
   } else {
     return [BYTE.limits.min, ...uint(min)];
@@ -565,7 +678,10 @@ section.import = function(imported) {
     ...vector(utf8(mod)),
     ...vector(utf8(field)),
     BYTE.import[type],
-    ...desc.map((idx) => [...uint(idx)])
+    ...{
+      "func": () => desc.map((idx) => [...uint(idx)]),
+      "memory": () => limits(...desc)
+    }[type]()
   ])));
 };
 section.function = function(funcs) {
@@ -648,25 +764,27 @@ var ModuleBuilder = class {
   import(type, name, mod, field, params, results) {
     if (type === "func") {
       const func = this._func(name, params, results, [], [], false, true);
-      this.imports.push({mod, field, type, desc: [func.type_idx]});
+      this.imports.push({ mod, field, type, desc: [func.type_idx] });
+    } else if (type === "memory") {
+      this.imports.push({ mod, field, type, desc: params });
     }
     return this;
   }
   table(type, min, max) {
-    this.tables.push({type, min, max});
+    this.tables.push({ type, min, max });
     return this;
   }
   memory(name, min, max) {
-    this.memories.push({name, min, max});
+    this.memories.push({ name, min, max });
     return this;
   }
   global(name, mut, valtype, expr) {
     const global_idx = this.globals.length;
-    this.globals.push({idx: global_idx, name, valtype, mut, expr});
+    this.globals.push({ idx: global_idx, name, valtype, mut, expr });
     return this;
   }
   export(type, name, export_name) {
-    this.exports.push({type, name, export_name});
+    this.exports.push({ type, name, export_name });
     return this;
   }
   start(name) {
@@ -674,13 +792,13 @@ var ModuleBuilder = class {
     return this;
   }
   elem(offset_idx_expr, codes) {
-    this.elements.push({offset_idx_expr, codes});
+    this.elements.push({ offset_idx_expr, codes });
     return this;
   }
   _func(name, params = [], results = [], locals2 = [], body = [], exported = false, imported = false) {
     const type_idx = this.ensureType(params, results);
     const func_idx = this.codes.length;
-    const func = {idx: func_idx, name, type_idx, locals: locals2, body, imported};
+    const func = { idx: func_idx, name, type_idx, locals: locals2, body, imported };
     this.codes.push(func);
     if (exported) {
       this.export("func", name, name);
@@ -692,18 +810,22 @@ var ModuleBuilder = class {
     return this;
   }
   data(offset_idx_expr, bytes) {
-    this.datas.push({offset_idx_expr, bytes});
+    this.datas.push({ offset_idx_expr, bytes });
     return this;
   }
-  build() {
-    console.time("module build");
+  build({ metrics = true } = {}) {
+    metrics && console.time("module build");
     const bytes = new ByteArray();
     bytes.write(header());
-    bytes.write(section.type(this.types.map((type) => type.split(",").map((x) => x.split(" ").filter(Boolean)))));
+    if (this.types.length) {
+      bytes.write(section.type(this.types.map((type) => type.split(",").map((x) => x.split(" ").filter(Boolean)))));
+    }
     if (this.imports.length) {
       bytes.write(section.import(this.imports.map((imp) => [imp.mod, imp.field, imp.type, imp.desc])));
     }
-    bytes.write(section.function(this.funcs.map((func) => func.type_idx)));
+    if (this.funcs.length) {
+      bytes.write(section.function(this.funcs.map((func) => func.type_idx)));
+    }
     if (this.elements.length) {
       bytes.write(section.table(this.tables.map((table) => [table.type, table.min, table.max])));
     }
@@ -726,7 +848,9 @@ var ModuleBuilder = class {
         elem.codes.map((name) => this.getFunc(name).idx)
       ])));
     }
-    bytes.write(section.code(this.funcs.map((func) => [func.locals, func.body])));
+    if (this.funcs.length) {
+      bytes.write(section.code(this.funcs.map((func) => [func.locals, func.body])));
+    }
     if (this.datas.length) {
       bytes.write(section.data(this.datas.map((data) => [
         0,
@@ -734,11 +858,10 @@ var ModuleBuilder = class {
         data.bytes
       ])));
     }
-    console.timeEnd("module build");
+    metrics && console.timeEnd("module build");
     return bytes;
   }
 };
-var builder_default = ModuleBuilder;
 
 // lib/compiler.js
 var GlobalContext = class {
@@ -766,7 +889,7 @@ var GlobalContext = class {
   }
 };
 function compile(node) {
-  const m = new builder_default();
+  const m = new ModuleBuilder();
   const g = new GlobalContext();
   const deferred = [];
   function cast(param, context = g, instr2 = "i32") {
@@ -845,7 +968,7 @@ function compile(node) {
     return [...INSTR[instr2](args, expr)];
   }
   function evaluate(node2, context = g) {
-    const address = {offset: 0, align: 0};
+    const address = { offset: 0, align: 0 };
     const instr2 = node2.instr.value;
     switch (instr2) {
       case "type": {
@@ -1064,10 +1187,18 @@ function compile(node) {
         break;
       case "import":
         {
-          const args = node2.params.map((x) => cast(x.param));
-          const func = evaluate(node2.children[0]);
-          const name = func.shift();
-          m.import("func", name, ...args, ...func);
+          if (node2.children[0].instr.value === "func") {
+            const args = node2.params.map((x) => cast(x.param));
+            const func = evaluate(node2.children[0]);
+            const name = func.shift();
+            m.import("func", name, ...args, ...func);
+          } else if (node2.children[0].instr.value === "memory") {
+            const memory = node2.children[0];
+            const args = node2.params.map((x) => cast(x.param));
+            const name = memory.instr.name;
+            const desc = memory.params.map((x) => cast(x.param));
+            m.import("memory", name, ...args, desc);
+          }
         }
         break;
       case "global":
@@ -1171,114 +1302,13 @@ function compile(node) {
   }
   build(node);
   deferred.forEach((fn) => fn());
-  return m.build();
-}
-
-// lib/parser.js
-function parse({start, peek, accept, expect}) {
-  const encoder2 = new TextEncoder("utf-8");
-  function parseDataString() {
-    const parsed = [];
-    while (1) {
-      const str = accept("string");
-      if (!str)
-        break;
-      if (str.value[0] === "\\" && str.value[1].match(/[0-9a-f]/i)) {
-        const match = str.value.matchAll(/\\([0-9a-f]{1,2})/gi);
-        for (const m of match) {
-          parsed.push(parseInt(m[1], 16));
-        }
-      } else {
-        str.value = str.value.replace(/\\n/, "\n");
-        parsed.push(...encoder2.encode(str.value));
-      }
-    }
-    return parsed;
-  }
-  function* params() {
-    let param;
-    while (1) {
-      if (param = accept("number")) {
-        param.value = param.value.replace(/_/g, "");
-        yield {param};
-        continue;
-      }
-      if (param = accept("hex")) {
-        param.value = param.value.replace(/_/g, "");
-        yield {param};
-        continue;
-      }
-      if (param = accept("string")) {
-        yield {param};
-        continue;
-      }
-      if (param = accept("label")) {
-        yield {param};
-        continue;
-      }
-      if (param = accept("param")) {
-        let value;
-        if (value = accept("number")) {
-          yield {param, value};
-          continue;
-        }
-        if (value = accept("hex")) {
-          yield {param, value};
-          continue;
-        } else {
-          yield {param};
-          continue;
-        }
-      }
-      break;
-    }
-  }
-  function expr() {
-    const ref = accept("label");
-    if (ref)
-      return {ref};
-    if (peek("string")) {
-      return {data: parseDataString()};
-    }
-    const sexpr = accept("lparen");
-    let instr2;
-    if (sexpr) {
-      instr2 = expect("instr");
-    } else {
-      instr2 = accept("instr");
-      if (!instr2)
-        return;
-    }
-    const node = {
-      instr: instr2,
-      name: accept("label"),
-      params: [...params()],
-      children: []
-    };
-    if (sexpr) {
-      let child;
-      while (!peek("eof") && (child = expr())) {
-        node.children.push(child);
-      }
-      node.params.push(...params());
-      expect("rparen");
-    } else if (instr2.value === "block" || instr2.value === "loop") {
-      let child;
-      while (!peek("eof") && !peek("instr", "end") && (child = expr())) {
-        node.children.push(child);
-      }
-      expect("instr", "end");
-    }
-    return node;
-  }
-  start();
-  return expr();
+  return m;
 }
 
 // index.js
-function wel_default(code) {
-  return compile(parse(tokenize("(module " + code + ")")));
+function compile2(code, options) {
+  return compile(parse(tokenize("(module " + code + ")"))).build(options).buffer;
 }
 export {
-  wel_default as default
+  compile2 as default
 };

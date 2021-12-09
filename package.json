@@ -1,6 +1,6 @@
 {
   "name": "wat-compiler",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "webassembly wat text format to binary compiler",
   "main": "index.js",
   "types": "./index.d.ts",
@@ -17,6 +17,8 @@
   "scripts": {
     "build": "esbuild --outdir=dist --format=cjs --bundle ./index.js",
     "test": "make test",
+    "prepack": "echo todo prepack",
+    "lint": "echo todo lint",
     "docs": "documentation readme index.js --resolve=node --pe js --re js --re d.ts --github --section=API --markdown-toc-max-depth=3"
   },
   "author": "stagas",
