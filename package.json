@@ -1,6 +1,6 @@
 {
   "name": "wat-compiler",
-  "version": "0.1.1",
+  "version": "1.0.0",
   "description": "webassembly wat text format to binary compiler",
   "main": "./dist/cjs/index.js",
   "types": "./index.d.ts",
@@ -32,7 +32,7 @@
   "author": "stagas",
   "license": "Public Domain",
   "devDependencies": {
-    "documentation": "github:documentationjs/documentation",
+    "@stagas/documentation-fork": "^13.2.5",
     "esbuild": "^0.14.2",
     "eslint": "^8.3.0",
     "rimraf": "^3.0.2"

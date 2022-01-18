@@ -27,10 +27,12 @@ $ npm i wat-compiler
 
 #### Table of Contents
 
-*   [compile](#compile)
+*   [make](#make)
     *   [Parameters](#parameters)
 
-### compile
+### make
+
+[index.js:25-27](https://github.com/stagas/wat-compiler/blob/da299d9672ca3cf692083212afadad27720fd8f1/index.js#L25-L27 "Source code on GitHub")
 
 Compiles a WAT source string to a buffer.
 
@@ -48,6 +50,7 @@ console.log(instance.exports.answer()) // => 42
 *   `options` **Options** An options object
 
     *   `options.metrics` **[boolean](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean)** Enable metrics with console.time
+*   `context`  &#x20;(optional, default `{}`)
 
 Returns **[Uint8Array](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array)** The buffer to be passed on to WebAssembly
 
