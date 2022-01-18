@@ -1,6 +1,10 @@
 import { tokenize } from './lib/lexer.js'
 import parse from './lib/parser.js'
-import c from './lib/compiler.js'
+import compile from './lib/compiler.js'
+
+export { tokenize }
+export { parse }
+export { compile }
 
 /**
  * Compiles a WAT source string to a buffer.
@@ -18,6 +22,6 @@ import c from './lib/compiler.js'
  * @param {boolean} options.metrics Enable metrics with console.time
  * @returns {Uint8Array} The buffer to be passed on to WebAssembly
  */
-export default function compile(code, options) {
-  return c(parse(tokenize('(module '+code+')'))).build(options).buffer
+export default function make(code, options, context = {}) {
+  return compile(parse(tokenize('(module '+code+')')), context.module, context.global).module.build(options).buffer
 }
