@@ -21,27 +21,25 @@
     "index.d.ts"
   ],
   "scripts": {
-    "build": "rimraf dist && npm run build:esm && npm run build:cjs",
-    "build:esm": "esbuild --outdir=dist/esm --format=esm --bundle ./index.js --sourcemap=both && echo '{\"type\":\"module\"}' >dist/esm/package.json",
-    "build:cjs": "esbuild --outdir=dist/cjs --format=cjs --bundle ./index.js --sourcemap=both",
+    "clean": "rimraf dist",
+    "build": "npm run build:esm && npm run build:cjs",
+    "build:esm": "esbuild --outdir=dist/esm --legal-comments=inline --format=esm --bundle ./index.js --sourcemap=both && echo '{\"type\":\"module\"}' >dist/esm/package.json",
+    "build:cjs": "esbuild --outdir=dist/cjs --legal-comments=inline --format=cjs --bundle ./index.js --sourcemap=both",
+    "build:watch": "onchange -i lib -- npm run build",
     "test": "make test",
-    "prepack": "echo todo prepack",
-    "lint": "echo todo lint",
-    "docs": "documentation readme index.js --resolve=node --pe js --re js --re d.ts --github --section=API --markdown-toc-max-depth=3"
+    "prepack": "npm run clean && npm run build",
+    "lint": "echo todo lint"
   },
   "author": "stagas",
   "license": "Public Domain",
   "devDependencies": {
-    "@stagas/documentation-fork": "^13.2.5",
     "esbuild": "^0.14.2",
     "eslint": "^8.3.0",
+    "onchange": "7.1.0",
     "rimraf": "^3.0.2"
   },
   "short": "stagas/wat-compiler",
   "repository": {
     "url": "git+https://git@github.com:stagas/wat-compiler.git"
-  },
-  "dependencies": {
-    "fast-text-encoding": "^1.0.3"
   }
 }
