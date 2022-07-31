@@ -1,295 +1,3 @@
-// lib/lexer.js
-var regexp = new RegExp([
-  /(?<comment>;;.*|\(;[^]*?;\))/,
-  /"(?<string>(?:\\"|[^"])*?)"/,
-  /(?<param>offset|align|shared|funcref)=?/,
-  /(?<hex>([+-]?nan:)?[+-]?0x[0-9a-f.p+-_]+)/,
-  /(?<number>[+-]?inf|[+-]?nan|[+-]?\d[\d.e_+-]*)/,
-  /(?<instr>[a-z][a-z0-9!#$%&'*+\-./:<=>?@\\^_`|~]+)/,
-  /\$(?<label>[a-z0-9!#$%&'*+\-./:<=>?@\\^_`|~]+)/,
-  /(?<lparen>\()|(?<rparen>\))|(?<nul>[ \t\n]+)|(?<error>.)/
-].map((x) => x.toString().slice(1, -1)).join("|"), "gi");
-function tokenize(input) {
-  let last = {};
-  let curr = {};
-  const matches = input.matchAll(regexp);
-  function next() {
-    const match = matches.next();
-    if (match.done)
-      return { value: { value: null, kind: "eof", index: input.length }, done: true };
-    const [kind, value] = Object.entries(match.value.groups).filter((e) => e[1] != null)[0];
-    return { value: { value, kind, index: match.value.index }, done: false };
-  }
-  function advance() {
-    last = curr;
-    do {
-      curr = next().value;
-    } while (curr.kind === "nul" || curr.kind === "comment");
-    return last;
-  }
-  function peek(kind, value) {
-    if (kind != null) {
-      if (value != null) {
-        return value === curr.value;
-      } else {
-        return kind === curr.kind;
-      }
-    }
-    return curr;
-  }
-  function accept(kind, value) {
-    if (kind === curr.kind) {
-      if (value != null) {
-        if (value === curr.value) {
-          return advance();
-        }
-      } else {
-        return advance();
-      }
-    }
-    return null;
-  }
-  function expect(kind, value) {
-    const token = accept(kind, value);
-    if (!token) {
-      throw new SyntaxError("Unexpected token: " + curr.value + "\n        expected: " + kind + (value ? ' "' + value + '"' : "") + "\n    but received: " + curr.kind + "\n     at position: " + curr.index);
-    }
-    return token;
-  }
-  const iterator = {
-    [Symbol.iterator]() {
-      return this;
-    },
-    next,
-    advance,
-    peek,
-    accept,
-    expect,
-    start: advance
-  };
-  return iterator;
-}
-
-// lib/parser.js
-function parse({ start, peek, accept, expect }) {
-  const encoder2 = new TextEncoder("utf-8");
-  function parseDataString() {
-    const parsed = [];
-    while (1) {
-      const str = accept("string");
-      if (!str)
-        break;
-      if (str.value[0] === "\\" && str.value[1].match(/[0-9a-f]/i)) {
-        const match = str.value.matchAll(/\\([0-9a-f]{1,2})/gi);
-        for (const m of match) {
-          parsed.push(parseInt(m[1], 16));
-        }
-      } else {
-        str.value = str.value.replace(/\\n/, "\n");
-        parsed.push(...encoder2.encode(str.value));
-      }
-    }
-    return parsed;
-  }
-  function* params() {
-    let param;
-    while (1) {
-      if (param = accept("number")) {
-        param.value = param.value.replace(/_/g, "");
-        yield { param };
-        continue;
-      }
-      if (param = accept("hex")) {
-        param.value = param.value.replace(/_/g, "");
-        yield { param };
-        continue;
-      }
-      if (param = accept("string")) {
-        yield { param };
-        continue;
-      }
-      if (param = accept("label")) {
-        yield { param };
-        continue;
-      }
-      if (param = accept("param")) {
-        let value;
-        if (value = accept("number")) {
-          yield { param, value };
-          continue;
-        }
-        if (value = accept("hex")) {
-          yield { param, value };
-          continue;
-        } else {
-          yield { param };
-          continue;
-        }
-      }
-      break;
-    }
-  }
-  function expr() {
-    const ref = accept("label");
-    if (ref)
-      return { ref };
-    if (peek("string")) {
-      return { data: parseDataString() };
-    }
-    const sexpr = accept("lparen");
-    let instr2;
-    if (sexpr) {
-      instr2 = expect("instr");
-    } else {
-      instr2 = accept("instr");
-      if (!instr2)
-        return;
-    }
-    const node = {
-      instr: instr2,
-      name: accept("label"),
-      params: [...params()],
-      children: []
-    };
-    if (sexpr) {
-      let child;
-      while (!peek("eof") && (child = expr())) {
-        node.children.push(child);
-      }
-      node.params.push(...params());
-      expect("rparen");
-    } else if (instr2.value === "block" || instr2.value === "loop") {
-      let child;
-      while (!peek("eof") && !peek("instr", "end") && (child = expr())) {
-        node.children.push(child);
-      }
-      expect("instr", "end");
-    }
-    return node;
-  }
-  start();
-  return expr();
-}
-
-// lib/leb128.js
-function* bigint(n) {
-  n = to_int64(n);
-  while (true) {
-    const byte = Number(n & 0x7Fn);
-    n >>= 7n;
-    if (n === 0n && (byte & 64) === 0 || n === -1n && (byte & 64) !== 0) {
-      yield byte;
-      break;
-    }
-    yield byte | 128;
-  }
-}
-function* int(value) {
-  let byte = 0;
-  const size = Math.ceil(Math.log2(Math.abs(value)));
-  const negative = value < 0;
-  let more = true;
-  while (more) {
-    byte = value & 127;
-    value = value >> 7;
-    if (negative) {
-      value = value | -(1 << size - 7);
-    }
-    if (value == 0 && (byte & 64) == 0 || value == -1 && (byte & 64) == 64) {
-      more = false;
-    } else {
-      byte = byte | 128;
-    }
-    yield byte;
-  }
-}
-function* uint(value, pad = 0) {
-  let byte = 0;
-  do {
-    byte = value & 127;
-    value = value >> 7;
-    if (value != 0 || pad > 0) {
-      byte = byte | 128;
-    }
-    yield byte;
-    pad--;
-  } while (value != 0 || pad > -1);
-}
-var byteView = new DataView(new BigInt64Array(1).buffer);
-function to_int64(value) {
-  byteView.setBigInt64(0, value);
-  return byteView.getBigInt64(0);
-}
-function* f32(value) {
-  byteView.setFloat32(0, value);
-  for (let i = 4; i--; )
-    yield byteView.getUint8(i);
-}
-function* f64(value) {
-  byteView.setFloat64(0, value);
-  for (let i = 8; i--; )
-    yield byteView.getUint8(i);
-}
-function hex2float(input) {
-  input = input.toUpperCase();
-  const splitIndex = input.indexOf("P");
-  let mantissa, exponent;
-  if (splitIndex !== -1) {
-    mantissa = input.substring(0, splitIndex);
-    exponent = parseInt(input.substring(splitIndex + 1));
-  } else {
-    mantissa = input;
-    exponent = 0;
-  }
-  const dotIndex = mantissa.indexOf(".");
-  if (dotIndex !== -1) {
-    let integerPart = parseInt(mantissa.substring(0, dotIndex), 16);
-    const sign = Math.sign(integerPart);
-    integerPart = sign * integerPart;
-    const fractionLength = mantissa.length - dotIndex - 1;
-    const fractionalPart = parseInt(mantissa.substring(dotIndex + 1), 16);
-    const fraction = fractionLength > 0 ? fractionalPart / Math.pow(16, fractionLength) : 0;
-    if (sign === 0) {
-      if (fraction === 0) {
-        mantissa = sign;
-      } else {
-        if (Object.is(sign, -0)) {
-          mantissa = -fraction;
-        } else {
-          mantissa = fraction;
-        }
-      }
-    } else {
-      mantissa = sign * (integerPart + fraction);
-    }
-  } else {
-    mantissa = parseInt(mantissa, 16);
-  }
-  return mantissa * (splitIndex !== -1 ? Math.pow(2, exponent) : 1);
-}
-var F32_SIGN = 2147483648;
-var F32_NAN = 2139095040;
-function* nanbox32(input) {
-  let value = parseInt(input.split("nan:")[1]);
-  value |= F32_NAN;
-  if (input[0] === "-")
-    value |= F32_SIGN;
-  byteView.setInt32(0, value);
-  for (let i = 4; i--; )
-    yield byteView.getUint8(i);
-}
-var F64_SIGN = 0x8000000000000000n;
-var F64_NAN = 0x7ff0000000000000n;
-function* nanbox64(input) {
-  let value = BigInt(input.split("nan:")[1]);
-  value |= F64_NAN;
-  if (input[0] === "-")
-    value |= F64_SIGN;
-  byteView.setBigInt64(0, value);
-  for (let i = 8; i--; )
-    yield byteView.getUint8(i);
-}
-
 // lib/const.js
 var BYTE = {
   "type.i32": 127,
@@ -593,7 +301,236 @@ var ALIGN = {
   "i64.store32": 4
 };
 
+// lib/leb128.js
+function* bigint(n) {
+  n = to_int64(n);
+  while (true) {
+    const byte = Number(n & 0x7Fn);
+    n >>= 7n;
+    if (n === 0n && (byte & 64) === 0 || n === -1n && (byte & 64) !== 0) {
+      yield byte;
+      break;
+    }
+    yield byte | 128;
+  }
+}
+function* int(value) {
+  let byte = 0;
+  const size = Math.ceil(Math.log2(Math.abs(value)));
+  const negative = value < 0;
+  let more = true;
+  while (more) {
+    byte = value & 127;
+    value = value >> 7;
+    if (negative) {
+      value = value | -(1 << size - 7);
+    }
+    if (value == 0 && (byte & 64) == 0 || value == -1 && (byte & 64) == 64) {
+      more = false;
+    } else {
+      byte = byte | 128;
+    }
+    yield byte;
+  }
+}
+function* uint(value, pad = 0) {
+  if (value < 0)
+    throw new TypeError("uint value must be positive, received: " + value);
+  let byte = 0;
+  do {
+    byte = value & 127;
+    value = value >> 7;
+    if (value != 0 || pad > 0) {
+      byte = byte | 128;
+    }
+    yield byte;
+    pad--;
+  } while (value != 0 || pad > -1);
+}
+var byteView = new DataView(new BigInt64Array(1).buffer);
+function to_int64(value) {
+  byteView.setBigInt64(0, value);
+  return byteView.getBigInt64(0);
+}
+function* f32(value) {
+  byteView.setFloat32(0, value);
+  for (let i = 4; i--; )
+    yield byteView.getUint8(i);
+}
+function* f64(value) {
+  byteView.setFloat64(0, value);
+  for (let i = 8; i--; )
+    yield byteView.getUint8(i);
+}
+function hex2float(input) {
+  input = input.toUpperCase();
+  const splitIndex = input.indexOf("P");
+  let mantissa, exponent;
+  if (splitIndex !== -1) {
+    mantissa = input.substring(0, splitIndex);
+    exponent = parseInt(input.substring(splitIndex + 1));
+  } else {
+    mantissa = input;
+    exponent = 0;
+  }
+  const dotIndex = mantissa.indexOf(".");
+  if (dotIndex !== -1) {
+    let integerPart = parseInt(mantissa.substring(0, dotIndex), 16);
+    const sign = Math.sign(integerPart);
+    integerPart = sign * integerPart;
+    const fractionLength = mantissa.length - dotIndex - 1;
+    const fractionalPart = parseInt(mantissa.substring(dotIndex + 1), 16);
+    const fraction = fractionLength > 0 ? fractionalPart / Math.pow(16, fractionLength) : 0;
+    if (sign === 0) {
+      if (fraction === 0) {
+        mantissa = sign;
+      } else {
+        if (Object.is(sign, -0)) {
+          mantissa = -fraction;
+        } else {
+          mantissa = fraction;
+        }
+      }
+    } else {
+      mantissa = sign * (integerPart + fraction);
+    }
+  } else {
+    mantissa = parseInt(mantissa, 16);
+  }
+  return mantissa * (splitIndex !== -1 ? Math.pow(2, exponent) : 1);
+}
+var F32_SIGN = 2147483648;
+var F32_NAN = 2139095040;
+function* nanbox32(input) {
+  let value = parseInt(input.split("nan:")[1]);
+  value |= F32_NAN;
+  if (input[0] === "-")
+    value |= F32_SIGN;
+  byteView.setInt32(0, value);
+  for (let i = 4; i--; )
+    yield byteView.getUint8(i);
+}
+var F64_SIGN = 0x8000000000000000n;
+var F64_NAN = 0x7ff0000000000000n;
+function* nanbox64(input) {
+  let value = BigInt(input.split("nan:")[1]);
+  value |= F64_NAN;
+  if (input[0] === "-")
+    value |= F64_SIGN;
+  byteView.setBigInt64(0, value);
+  for (let i = 8; i--; )
+    yield byteView.getUint8(i);
+}
+
 // lib/binary.js
+(function(l) {
+  function m() {
+  }
+  function k(a, c) {
+    a = a === void 0 ? "utf-8" : a;
+    c = c === void 0 ? { fatal: false } : c;
+    if (r.indexOf(a.toLowerCase()) === -1)
+      throw new RangeError("Failed to construct 'TextDecoder': The encoding label provided ('" + a + "') is invalid.");
+    if (c.fatal)
+      throw Error("Failed to construct 'TextDecoder': the 'fatal' option is unsupported.");
+  }
+  function t(a) {
+    return Buffer.from(a.buffer, a.byteOffset, a.byteLength).toString("utf-8");
+  }
+  function u(a) {
+    var c = URL.createObjectURL(new Blob([a], { type: "text/plain;charset=UTF-8" }));
+    try {
+      var f = new XMLHttpRequest();
+      f.open("GET", c, false);
+      f.send();
+      return f.responseText;
+    } catch (e) {
+      return q(a);
+    } finally {
+      URL.revokeObjectURL(c);
+    }
+  }
+  function q(a) {
+    for (var c = 0, f = Math.min(65536, a.length + 1), e = new Uint16Array(f), h = [], d = 0; ; ) {
+      var b = c < a.length;
+      if (!b || d >= f - 1) {
+        h.push(String.fromCharCode.apply(null, e.subarray(0, d)));
+        if (!b)
+          return h.join("");
+        a = a.subarray(c);
+        d = c = 0;
+      }
+      b = a[c++];
+      if ((b & 128) === 0)
+        e[d++] = b;
+      else if ((b & 224) === 192) {
+        var g = a[c++] & 63;
+        e[d++] = (b & 31) << 6 | g;
+      } else if ((b & 240) === 224) {
+        g = a[c++] & 63;
+        var n = a[c++] & 63;
+        e[d++] = (b & 31) << 12 | g << 6 | n;
+      } else if ((b & 248) === 240) {
+        g = a[c++] & 63;
+        n = a[c++] & 63;
+        var v = a[c++] & 63;
+        b = (b & 7) << 18 | g << 12 | n << 6 | v;
+        65535 < b && (b -= 65536, e[d++] = b >>> 10 & 1023 | 55296, b = 56320 | b & 1023);
+        e[d++] = b;
+      }
+    }
+  }
+  if (l.TextEncoder && l.TextDecoder)
+    return false;
+  var r = ["utf-8", "utf8", "unicode-1-1-utf-8"];
+  Object.defineProperty(m.prototype, "encoding", { value: "utf-8" });
+  m.prototype.encode = function(a, c) {
+    c = c === void 0 ? { stream: false } : c;
+    if (c.stream)
+      throw Error("Failed to encode: the 'stream' option is unsupported.");
+    c = 0;
+    for (var f = a.length, e = 0, h = Math.max(32, f + (f >>> 1) + 7), d = new Uint8Array(h >>> 3 << 3); c < f; ) {
+      var b = a.charCodeAt(c++);
+      if (55296 <= b && 56319 >= b) {
+        if (c < f) {
+          var g = a.charCodeAt(c);
+          (g & 64512) === 56320 && (++c, b = ((b & 1023) << 10) + (g & 1023) + 65536);
+        }
+        if (55296 <= b && 56319 >= b)
+          continue;
+      }
+      e + 4 > d.length && (h += 8, h *= 1 + c / a.length * 2, h = h >>> 3 << 3, g = new Uint8Array(h), g.set(d), d = g);
+      if ((b & 4294967168) === 0)
+        d[e++] = b;
+      else {
+        if ((b & 4294965248) === 0)
+          d[e++] = b >>> 6 & 31 | 192;
+        else if ((b & 4294901760) === 0)
+          d[e++] = b >>> 12 & 15 | 224, d[e++] = b >>> 6 & 63 | 128;
+        else if ((b & 4292870144) === 0)
+          d[e++] = b >>> 18 & 7 | 240, d[e++] = b >>> 12 & 63 | 128, d[e++] = b >>> 6 & 63 | 128;
+        else
+          continue;
+        d[e++] = b & 63 | 128;
+      }
+    }
+    return d.slice ? d.slice(0, e) : d.subarray(0, e);
+  };
+  Object.defineProperty(k.prototype, "encoding", { value: "utf-8" });
+  Object.defineProperty(k.prototype, "fatal", { value: false });
+  Object.defineProperty(k.prototype, "ignoreBOM", { value: false });
+  var p = q;
+  typeof Buffer === "function" && Buffer.from ? p = t : typeof Blob === "function" && typeof URL === "function" && typeof URL.createObjectURL === "function" && (p = u);
+  k.prototype.decode = function(a, c) {
+    c = c === void 0 ? { stream: false } : c;
+    if (c.stream)
+      throw Error("Failed to decode: the 'stream' option is unsupported.");
+    a = a instanceof Uint8Array ? a : a.buffer instanceof ArrayBuffer ? new Uint8Array(a.buffer) : new Uint8Array(a);
+    return p(a);
+  };
+  l.TextEncoder = m;
+  l.TextDecoder = k;
+})(typeof window !== "undefined" ? window : typeof global !== "undefined" ? global : globalThis);
 function wrap_instr(code) {
   return function(args, exprs) {
     return instr(code, args != null && !Array.isArray(args) ? [args] : args, exprs != null && !Array.isArray(exprs) ? [exprs] : exprs);
@@ -735,6 +672,10 @@ var ModuleBuilder = class {
   elements = [];
   codes = [];
   datas = [];
+  constructor(data) {
+    if (data)
+      Object.assign(this, data);
+  }
   get funcs() {
     return this.codes.filter((func) => !func.imported);
   }
@@ -836,7 +777,7 @@ var ModuleBuilder = class {
       bytes.write(section.global(this.globals.map((glob) => [glob.mut, glob.valtype, glob.expr])));
     }
     if (this.exports.length) {
-      bytes.write(section.export(this.exports.map((exp) => exp.type === "func" ? [exp.export_name, exp.type, this.getFunc(exp.name).idx] : exp.type === "memory" ? [exp.export_name, exp.type, this.getMemory(exp.name).idx] : [])));
+      bytes.write(section.export(this.exports.map((exp) => exp.type === "func" ? [exp.export_name, exp.type, this.getFunc(exp.name).idx] : exp.type === "memory" ? [exp.export_name, exp.type, this.getMemory(exp.name).idx] : exp.type === "global" ? [exp.export_name, exp.type, this.getGlobalIndexOf(exp.name)] : [])));
     }
     if (this.starts.length) {
       bytes.write(section.start(this.getFunc(this.starts).idx));
@@ -868,6 +809,14 @@ var GlobalContext = class {
   globals = [];
   types = [];
   funcs = [];
+  constructor(data) {
+    if (data) {
+      Object.assign(this, data);
+      this.funcs.forEach((x) => {
+        x.context = new FunctionContext(this, x.context);
+      });
+    }
+  }
   lookup(name, instr2) {
     let index;
     switch (instr2) {
@@ -885,12 +834,44 @@ var GlobalContext = class {
         index = this.globals.map((x) => x.name).lastIndexOf(name);
       }
     }
+    if (!~index)
+      throw new ReferenceError(`lookup failed at: ${instr2} "${name}"`);
     return uint(index);
   }
 };
-function compile(node) {
-  const m = new ModuleBuilder();
-  const g = new GlobalContext();
+var FunctionContext = class {
+  #global = null;
+  locals = [];
+  depth = [];
+  constructor(global2, data) {
+    this.#global = global2;
+    if (data)
+      Object.assign(this, data);
+  }
+  lookup(name, instr2) {
+    let index;
+    switch (instr2) {
+      case "br":
+      case "br_table":
+      case "br_if":
+        {
+          index = this.depth.lastIndexOf(name);
+          if (~index)
+            index = this.depth.length - 1 - index;
+        }
+        break;
+      default: {
+        index = this.locals.lastIndexOf(name);
+      }
+    }
+    if (!~index)
+      return this.#global.lookup(name, instr2);
+    return uint(index);
+  }
+};
+function compile(node, moduleData, globalData) {
+  const m = new ModuleBuilder(moduleData);
+  const g = new GlobalContext(globalData);
   const deferred = [];
   function cast(param, context = g, instr2 = "i32") {
     switch (param.kind) {
@@ -935,30 +916,6 @@ function compile(node) {
         return context.lookup(param.value, instr2);
       default:
         return param.value;
-    }
-  }
-  class FunctionContext {
-    locals = [];
-    depth = [];
-    lookup(name, instr2) {
-      let index;
-      switch (instr2) {
-        case "br":
-        case "br_table":
-        case "br_if":
-          {
-            index = this.depth.lastIndexOf(name);
-            if (~index)
-              index = this.depth.length - 1 - index;
-          }
-          break;
-        default: {
-          index = this.locals.lastIndexOf(name);
-        }
-      }
-      if (!~index)
-        return g.lookup(name, instr2);
-      return uint(index);
     }
   }
   function bytes(instr2, args, expr) {
@@ -1209,6 +1166,11 @@ function compile(node) {
             type: node2.children[0].instr.value
           };
           g.globals.push(glob);
+          if (glob.type === "export") {
+            const export_name = node2.children.shift().params[0].param.value;
+            m.export("global", glob.name, export_name);
+            glob.type = node2.children[0].instr.value;
+          }
           if (glob.type === "mut") {
             glob.vartype = "var";
             glob.type = node2.children[0].children[0].instr.value;
@@ -1256,7 +1218,7 @@ function compile(node) {
         {
           const func = {
             name: node2.name?.value ?? g.funcs.length,
-            context: new FunctionContext(),
+            context: new FunctionContext(g),
             params: [],
             results: [],
             locals: [],
@@ -1302,13 +1264,191 @@ function compile(node) {
   }
   build(node);
   deferred.forEach((fn) => fn());
-  return m;
+  return { module: m, global: g };
+}
+
+// lib/lexer.js
+var regexp = new RegExp([
+  /(?<comment>;;.*|\(;[^]*?;\))/,
+  /"(?<string>(?:\\"|[^"])*?)"/,
+  /(?<param>offset|align|shared|funcref)=?/,
+  /(?<hex>([+-]?nan:)?[+-]?0x[0-9a-f.p+-_]+)/,
+  /(?<number>[+-]?inf|[+-]?nan|[+-]?\d[\d.e_+-]*)/,
+  /(?<instr>[a-z][a-z0-9!#$%&'*+\-./:<=>?@\\^_`|~]+)/,
+  /\$(?<label>[a-z0-9!#$%&'*+\-./:<=>?@\\^_`|~]+)/,
+  /(?<lparen>\()|(?<rparen>\))|(?<nul>[ \t\n]+)|(?<error>.)/
+].map((x) => x.toString().slice(1, -1)).join("|"), "gi");
+function tokenize(input) {
+  let last = {};
+  let curr = {};
+  const matches = input.matchAll(regexp);
+  function next() {
+    const match = matches.next();
+    if (match.done)
+      return { value: { value: null, kind: "eof", index: input.length }, done: true };
+    const [kind, value] = Object.entries(match.value.groups).filter((e) => e[1] != null)[0];
+    return { value: { value, kind, index: match.value.index }, done: false };
+  }
+  function advance() {
+    last = curr;
+    do {
+      curr = next().value;
+    } while (curr.kind === "nul" || curr.kind === "comment");
+    return last;
+  }
+  function peek(kind, value) {
+    if (kind != null) {
+      if (value != null) {
+        return value === curr.value;
+      } else {
+        return kind === curr.kind;
+      }
+    }
+    return curr;
+  }
+  function accept(kind, value) {
+    if (kind === curr.kind) {
+      if (value != null) {
+        if (value === curr.value) {
+          return advance();
+        }
+      } else {
+        return advance();
+      }
+    }
+    return null;
+  }
+  function expect(kind, value) {
+    const token = accept(kind, value);
+    if (!token) {
+      throw new SyntaxError("Unexpected token: " + curr.value + "\n        expected: " + kind + (value ? ' "' + value + '"' : "") + "\n    but received: " + curr.kind + "\n     at position: " + curr.index);
+    }
+    return token;
+  }
+  const iterator = {
+    [Symbol.iterator]() {
+      return this;
+    },
+    next,
+    advance,
+    peek,
+    accept,
+    expect,
+    start: advance
+  };
+  return iterator;
+}
+
+// lib/parser.js
+function parse({ start, peek, accept, expect }) {
+  const encoder2 = new TextEncoder("utf-8");
+  function parseDataString() {
+    const parsed = [];
+    while (1) {
+      const str = accept("string");
+      if (!str)
+        break;
+      if (str.value[0] === "\\" && str.value[1].match(/[0-9a-f]/i)) {
+        const match = str.value.matchAll(/\\([0-9a-f]{1,2})/gi);
+        for (const m of match) {
+          parsed.push(parseInt(m[1], 16));
+        }
+      } else {
+        str.value = str.value.replace(/\\n/, "\n");
+        parsed.push(...encoder2.encode(str.value));
+      }
+    }
+    return parsed;
+  }
+  function* params() {
+    let param;
+    while (1) {
+      if (param = accept("number")) {
+        param.value = param.value.replace(/_/g, "");
+        yield { param };
+        continue;
+      }
+      if (param = accept("hex")) {
+        param.value = param.value.replace(/_/g, "");
+        yield { param };
+        continue;
+      }
+      if (param = accept("string")) {
+        yield { param };
+        continue;
+      }
+      if (param = accept("label")) {
+        yield { param };
+        continue;
+      }
+      if (param = accept("param")) {
+        let value;
+        if (value = accept("number")) {
+          yield { param, value };
+          continue;
+        }
+        if (value = accept("hex")) {
+          yield { param, value };
+          continue;
+        } else {
+          yield { param };
+          continue;
+        }
+      }
+      break;
+    }
+  }
+  function expr() {
+    const ref = accept("label");
+    if (ref)
+      return { ref };
+    if (peek("string")) {
+      return { data: parseDataString() };
+    }
+    const sexpr = accept("lparen");
+    let instr2;
+    if (sexpr) {
+      instr2 = expect("instr");
+    } else {
+      instr2 = accept("instr");
+      if (!instr2)
+        return;
+    }
+    const node = {
+      instr: instr2,
+      name: accept("label"),
+      params: [...params()],
+      children: []
+    };
+    if (sexpr) {
+      let child;
+      while (!peek("eof") && (child = expr())) {
+        node.children.push(child);
+      }
+      node.params.push(...params());
+      expect("rparen");
+    } else if (instr2.value === "block" || instr2.value === "loop") {
+      let child;
+      while (!peek("eof") && !peek("instr", "end") && (child = expr())) {
+        node.children.push(child);
+      }
+      expect("instr", "end");
+    }
+    return node;
+  }
+  start();
+  return expr();
 }
 
 // index.js
-function compile2(code, options) {
-  return compile(parse(tokenize("(module " + code + ")"))).build(options).buffer;
+function make(code, options, context = {}) {
+  return compile(parse(tokenize("(module " + code + ")")), context.module, context.global).module.build(options).buffer;
 }
 export {
-  compile2 as default
+  GlobalContext,
+  ModuleBuilder,
+  compile,
+  make as default,
+  parse,
+  tokenize
 };

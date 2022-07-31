@@ -1,10 +1,14 @@
-declare interface Options {
+export declare interface Options {
   metrics: boolean
 }
 
-declare interface Context {
+export declare interface GlobalContext {
+  globals: ({ name: string, vartype: string, type: string })[]
+}
+
+export declare interface Context {
   module: ModuleBuilder
-  context: any
+  global: GlobalContext
 }
 
 declare const make: {
@@ -14,7 +18,7 @@ declare const make: {
 declare type ModuleBuilder = any
 
 declare const compile: {
-  (node: Node): ModuleBuilder
+  (node: Node): Context
 }
 
 declare type Node = any
@@ -28,6 +32,8 @@ declare const tokenize: {
 }
 
 export {
+  GlobalContext,
+  ModuleBuilder,
   tokenize,
   parse,
   compile,

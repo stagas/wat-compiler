@@ -1,10 +1,12 @@
+import ModuleBuilder from './lib/builder.js'
+import compile, { GlobalContext } from './lib/compiler.js'
 import { tokenize } from './lib/lexer.js'
 import parse from './lib/parser.js'
-import compile from './lib/compiler.js'
 
 export { tokenize }
 export { parse }
 export { compile }
+export { ModuleBuilder, GlobalContext }
 
 /**
  * Compiles a WAT source string to a buffer.
@@ -20,6 +22,9 @@ export { compile }
  * @param {string} code The WAT code to compile
  * @param {Options} options An options object
  * @param {boolean} options.metrics Enable metrics with console.time
+ * @param {Context} context
+ * @param {ModuleBuilder} context.module
+ * @param {GlobalContext} context.global
  * @returns {Uint8Array} The buffer to be passed on to WebAssembly
  */
 export default function make(code, options, context = {}) {

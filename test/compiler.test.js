@@ -1,6 +1,6 @@
+import compile from '../lib/compiler.js'
 import { tokenize } from '../lib/lexer.js'
 import parse from '../lib/parser.js'
-import compile from '../lib/compiler.js'
 import { hexAssertEqual } from './util/hex.js'
 import wat from './util/wat.js'
 
@@ -25,6 +25,22 @@ describe('compile', () => {
   .then(async ([exp,act]) => {
     expect((await wasm(exp)).answer()).to.equal(42)
     expect((await wasm(act)).answer()).to.equal(42)
+  }))
+
+  it('minimal function negative', () => buffers(`
+    (func (export "answer") (result f32)
+      (f32.convert_i32_s
+        (i32.mul
+          (i32.const -1)
+          (i32.const 1)
+        )
+      )
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).answer()).to.equal(-1)
+    expect((await wasm(act)).answer()).to.equal(-1)
   }))
 
   //
@@ -175,6 +191,20 @@ describe('compile', () => {
   it('1 global var (mut)', () => buffers(`
 
     (global $answer (mut i32) (i32.const 42))
+
+    (func (export "get") (result i32)
+      (global.get $answer)
+    )
+  `)
+  .then(([exp,act]) => hexAssertEqual(exp,act))
+  .then(async ([exp,act]) => {
+    expect((await wasm(exp)).get()).to.equal(42)
+    expect((await wasm(act)).get()).to.equal(42)
+  }))
+
+  it('1 global var export (mut)', () => buffers(`
+
+    (global $answer (export "answer") (mut i32) (i32.const 42))
 
     (func (export "get") (result i32)
       (global.get $answer)
