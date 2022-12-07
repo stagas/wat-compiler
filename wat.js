@@ -260,6 +260,7 @@ for (const [i, op] of opCodes.entries()) {
     BYTE[op] = i;
   }
 }
+BYTE["i32.trunc_sat_f64_s"] = [252, 2];
 for (const name in alias) {
   const i = opCodes.indexOf(alias[name]);
   BYTE[name] = i;
@@ -551,7 +552,7 @@ function* instr(code, args = [], exprs = []) {
         break;
     }
   }
-  yield BYTE[code];
+  yield* Array.isArray(BYTE[code]) ? BYTE[code] : [BYTE[code]];
   for (let arg of args) {
     switch (typeof arg) {
       case "bigint":
@@ -693,6 +694,7 @@ var ModuleBuilder = class {
     return this.codes.find((func) => func.name === name);
   }
   getMemory(name) {
+    console.log(name, this.memories);
     return this.memories.find((mem) => mem.name === name);
   }
   getType(name) {
@@ -755,7 +757,6 @@ var ModuleBuilder = class {
     return this;
   }
   build({ metrics = true } = {}) {
-    metrics && console.time("module build");
     const bytes = new ByteArray();
     bytes.write(header());
     if (this.types.length) {
@@ -799,7 +800,6 @@ var ModuleBuilder = class {
         data.bytes
       ])));
     }
-    metrics && console.timeEnd("module build");
     return bytes;
   }
 };
@@ -1011,7 +1011,7 @@ function compile(node, moduleData, globalData) {
         const name = node2.name?.value ?? context.depth.length;
         const results = [];
         const branches = [];
-        let cond;
+        let cond, thenbody;
         context.depth.push(name);
         for (const c of node2.children) {
           switch (c.instr.value) {
@@ -1024,11 +1024,22 @@ function compile(node, moduleData, globalData) {
               branches.push(...INSTR.else());
             case "then":
               {
-                branches.push(evaluate(c, context));
+                thenbody = evaluate(c, context);
+                branches.push(thenbody);
               }
               break;
             default: {
-              cond = evaluate(c, context);
+              if (cond) {
+                if (thenbody) {
+                  branches.push(...INSTR.else());
+                  branches.push(evaluate(c, context));
+                } else {
+                  thenbody = evaluate(c, context);
+                  branches.push(thenbody);
+                }
+              } else {
+                cond = evaluate(c, context);
+              }
             }
           }
         }
@@ -1110,7 +1121,7 @@ function compile(node, moduleData, globalData) {
           const args = node2.params.map((x) => cast(x.param)).flat();
           if (node2.children?.[0]?.instr.value === "export") {
             const export_name = node2.children[0].params[0].param.value;
-            const internal_name = node2.children[0].name?.value ?? 0;
+            const internal_name = node2.children[0].name?.value ?? name ?? 0;
             m.export("memory", internal_name, export_name);
           }
           m.memory(name, ...args);
@@ -1342,20 +1353,40 @@ function tokenize(input) {
 // lib/parser.js
 function parse({ start, peek, accept, expect }) {
   const encoder2 = new TextEncoder("utf-8");
+  const HEX = /[0-9a-f]/i;
+  const stringchar = {
+    t: 9,
+    n: 10,
+    r: 13,
+    '"': 34,
+    "'": 39,
+    "\\": 92
+  };
   function parseDataString() {
     const parsed = [];
     while (1) {
       const str = accept("string");
       if (!str)
         break;
-      if (str.value[0] === "\\" && str.value[1].match(/[0-9a-f]/i)) {
-        const match = str.value.matchAll(/\\([0-9a-f]{1,2})/gi);
-        for (const m of match) {
-          parsed.push(parseInt(m[1], 16));
+      for (let i = 0, ch, next; i < str.value.length; i++) {
+        ch = str.value[i];
+        if (ch === "\\") {
+          next = str.value[i + 1];
+          if (next in stringchar) {
+            parsed.push(stringchar[next]);
+            i++;
+            continue;
+          } else if (HEX.test(next)) {
+            if (HEX.test(str.value[i + 2])) {
+              parsed.push(parseInt(`${next}${str.value[i += 2]}`, 16));
+            } else {
+              parsed.push(parseInt(next, 16));
+              i++;
+            }
+            continue;
+          }
         }
-      } else {
-        str.value = str.value.replace(/\\n/, "\n");
-        parsed.push(...encoder2.encode(str.value));
+        parsed.push(encoder2.encode(ch));
       }
     }
     return parsed;
@@ -1452,3 +1483,5 @@ export {
   parse,
   tokenize
 };
+//!time 'module build'
+//!timeEnd 'module build'

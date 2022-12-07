@@ -1,0 +1,25 @@
+{
+  "jsc": {
+    "target": "es2022",
+    "parser": {
+      "syntax": "typescript",
+      "tsx": true,
+      "decorators": true,
+      "dynamicImport": true
+    },
+    "transform": {
+      "legacyDecorator": true,
+      "decoratorMetadata": true,
+      "useDefineForClassFields": true,
+      "react": {
+        "runtime": "automatic"
+      },
+      "hidden": {
+        "jest": true
+      }
+    },
+    "keepClassNames": true
+  },
+  "sourceMaps": true,
+  "inlineSourcesContent": true
+}

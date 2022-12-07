@@ -15,7 +15,13 @@ declare const make: {
   (string: string, options?: Options, context?: Context): Uint8Array
 }
 
-declare type ModuleBuilder = any
+export declare interface ModuleBuilder {
+
+}
+
+export declare interface FunctionContext {
+
+}
 
 declare const compile: {
   (node: Node): Context
@@ -32,8 +38,6 @@ declare const tokenize: {
 }
 
 export {
-  GlobalContext,
-  ModuleBuilder,
   tokenize,
   parse,
   compile,

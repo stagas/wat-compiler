@@ -22,10 +22,10 @@
   ],
   "scripts": {
     "clean": "rimraf dist",
-    "build": "npm run build:esm && npm run build:cjs",
+    "build": "fpm run build:esm && fpm run build:cjs",
     "build:esm": "esbuild --outdir=dist/esm --legal-comments=inline --format=esm --bundle ./index.js --sourcemap=both && echo '{\"type\":\"module\"}' >dist/esm/package.json",
     "build:cjs": "esbuild --outdir=dist/cjs --legal-comments=inline --format=cjs --bundle ./index.js --sourcemap=both",
-    "build:watch": "onchange -i lib -- npm run build",
+    "build:watch": "onchange -i lib -- fpm run build",
     "test": "make test",
     "prepack": "npm run clean && npm run build",
     "prepush": "echo ok",
@@ -42,5 +42,8 @@
   "short": "stagas/wat-compiler",
   "repository": {
     "url": "git+https://git@github.com:stagas/wat-compiler.git"
+  },
+  "dependencies": {
+    "wabt": "*"
   }
 }

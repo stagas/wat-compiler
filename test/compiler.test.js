@@ -930,23 +930,24 @@ describe('compile', () => {
 
   // e2e
   const e2e = [
-    'malloc',
-    'brownian',
-    'containers',
-    'quine',
-    'fire',
-    'metaball',
-    'raytrace',
-    'snake',
-    'maze',
-    'dino',
-    'raycast',
+    // 'malloc',
+    // 'brownian',
+    // 'containers',
+    // 'quine',
+    // 'fire',
+    // 'metaball',
+    // 'raytrace',
+    // 'snake',
+    // 'maze',
+    'math',
+    // 'dino',
+    // 'raycast',
   ]
 
   e2e.forEach(name => {
-    it('e2e: '+name, () =>
-      fetch('/test/fixtures/e2e/'+name+'.wat')
-      .then(res => res.text())
+    it.only('e2e: '+name, () =>
+      require('fs').promises.readFile('./test/fixtures/e2e/'+name+'.wat', 'utf-8')
+      // .then(res => res.text())
       .then(text => buffers(text))
       .then(([exp,act]) => hexAssertEqual(exp,act)))
   })

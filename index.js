@@ -1,12 +1,12 @@
 import ModuleBuilder from './lib/builder.js'
-import compile, { GlobalContext } from './lib/compiler.js'
+import compile, { GlobalContext, FunctionContext } from './lib/compiler.js'
 import { tokenize } from './lib/lexer.js'
 import parse from './lib/parser.js'
 
 export { tokenize }
 export { parse }
 export { compile }
-export { ModuleBuilder, GlobalContext }
+export { ModuleBuilder, GlobalContext, FunctionContext }
 
 /**
  * Compiles a WAT source string to a buffer.
