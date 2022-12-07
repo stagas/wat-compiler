@@ -1,6 +1,6 @@
 {
   "name": "wat-compiler",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "webassembly wat text format to binary compiler",
   "main": "./dist/cjs/index.js",
   "types": "./index.d.ts",
